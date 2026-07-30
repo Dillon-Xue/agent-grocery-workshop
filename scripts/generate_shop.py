@@ -122,16 +122,17 @@ TEMPLATE = """<!doctype html>
   .ds-row{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-bottom:18px}
   .dash-section{background:var(--panel);border:1px solid var(--border);border-radius:var(--r);padding:18px}
   .ds-title{font-size:13px;font-weight:700;margin-bottom:12px;display:flex;align-items:center;gap:6px}
-  .donut-wrap{text-align:center}
-  .dl-item{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text2);padding:3px 0}
+  .donut-wrap{display:flex;align-items:center;gap:20px;text-align:left}
+  .donut-legend{display:flex;flex-direction:column;gap:5px}
+  .dl-item{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--text2);padding:2px 0;justify-content:flex-start}
   .dl-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
-  .bar-list{display:flex;flex-direction:column;gap:8px}
-  .bar-row{display:flex;align-items:center;gap:8px;font-size:12px}
-  .bar-label{width:70px;flex-shrink:0;color:var(--text2)}
-  .bar-track{flex:1;height:18px;background:rgba(0,0,0,.15);border-radius:9px;overflow:hidden}
-  .bar-fill{height:100%;border-radius:9px;font-size:10px;color:#fff;padding:0 8px;
+  .bar-list{display:flex;flex-direction:column;gap:10px}
+  .bar-row{display:flex;align-items:center;gap:8px;font-size:14px}
+  .bar-label{width:80px;flex-shrink:0;color:var(--text2);font-weight:600}
+  .bar-track{flex:1;height:24px;background:rgba(0,0,0,.15);border-radius:12px;overflow:hidden}
+  .bar-fill{height:100%;border-radius:12px;font-size:12px;color:#fff;padding:0 10px;
     display:flex;align-items:center;white-space:nowrap;min-width:28px;justify-content:flex-end}
-  .bar-count{width:36px;text-align:right;color:var(--muted);font-size:11px}
+  .bar-count{width:42px;text-align:right;color:var(--muted);font-size:13px}
   .heat-list{list-style:none;padding:0;margin:0}
   .heat-item{display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid var(--border)}
   .heat-rank{width:24px;height:24px;border-radius:6px;display:grid;place-items:center;
@@ -182,17 +183,36 @@ TEMPLATE = """<!doctype html>
   .dept.collapsed .dept-arrow{transform:rotate(-90deg)}
   .dept-body{padding:12px 14px 16px}
   .dept.collapsed .dept-body{display:none}
-  .sub-cols{display:flex;gap:14px;overflow-x:auto;padding-bottom:4px}
-  .sub-col{min-width:240px;max-width:300px;flex:1;min-width:0;
-    border:1px solid var(--border);border-radius:var(--r2);background:var(--solid);overflow:hidden}
-  .sub-col-head{padding:8px 12px;font-size:11px;font-weight:700;color:var(--muted);
-    text-transform:uppercase;letter-spacing:.5px;display:flex;align-items:center;gap:6px;
-    border-bottom:1px solid var(--border);background:var(--panel2)}
-  .sub-col-head .dot{width:8px;height:8px;border-radius:50%;background:var(--c,var(--c0))}
-  .sub-col-cnt{margin-left:auto;font-size:10px;color:var(--muted);background:var(--panel);padding:1px 8px;border-radius:10px}
-  .sub-col-body{max-height:420px;overflow-y:auto;padding:8px;display:flex;flex-direction:column;gap:8px}
-  .sub-col-body::-webkit-scrollbar{width:4px}
-  .sub-col-body::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
+  /* Shelf toolbar + view toggle */
+  .shelf-toolbar{display:flex;align-items:center;justify-content:flex-start;gap:8px;margin-bottom:14px}
+  .view-toggle{display:inline-flex;border:1px solid var(--border);border-radius:20px;overflow:hidden;background:var(--panel)}
+  .vt-btn{padding:6px 16px;border:none;background:transparent;color:var(--muted);font-size:12px;font-weight:600;cursor:pointer;transition:.2s}
+  .vt-btn:hover{color:var(--text)}
+  .vt-btn.active{color:#fff;background:var(--c0)}
+
+  /* Card grid: 2 rows x 6 cols (12/page) */
+  .shelf-cards{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:12px;padding-top:4px}
+  .shelf-cards .card{min-height:96px}
+
+  /* List table: 10/page */
+  .shelf-list{margin-top:4px;overflow-x:auto}
+  .shelf-list table{width:100%;border-collapse:collapse;font-size:12px}
+  .shelf-list th{text-align:left;padding:8px 12px;color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.4px;border-bottom:1px solid var(--border);background:var(--panel2)}
+  .shelf-list td{padding:9px 12px;border-bottom:1px solid var(--border);color:var(--text2);vertical-align:middle}
+  .shelf-list tr.list-row{cursor:pointer;transition:.15s}
+  .shelf-list tr.list-row:hover{background:color-mix(in srgb, var(--c,var(--accent)) 8%, transparent)}
+  .shelf-list .lt-name{font-weight:700;color:var(--text);font-size:13px}
+
+  /* Per-department pager */
+  .dept-pager{display:flex;align-items:center;gap:10px;justify-content:center;padding:14px 0 4px;margin-top:8px;border-top:1px solid var(--border)}
+  .pg-btn{padding:5px 16px;border:1px solid var(--border);border-radius:20px;background:var(--solid);color:var(--text);font-size:12px;font-weight:600;cursor:pointer;transition:.15s}
+  .pg-btn:hover:not([disabled]){border-color:var(--accent);color:var(--accent)}
+  .pg-btn[disabled]{opacity:.35;cursor:not-allowed}
+  .pg-info{font-size:12px;color:var(--text2);font-weight:600}
+  .pg-all{font-size:11px;color:var(--muted);margin-left:6px}
+
+  /* Card sub-category label */
+  .card-sub{font-size:10px;color:var(--muted);padding:0 12px 2px;line-height:1.3}
 
   /* Cards */
   .card{border:1px solid var(--border);border-radius:var(--r2);cursor:pointer;transition:.2s;
@@ -404,7 +424,7 @@ TEMPLATE = """<!doctype html>
     return Object.entries(tm).map(([label,count])=>{
       const pct=Math.round(count/total*100);
       const names={prompt:'Prompt片段',python:'代码',process:'流程规范',config:'配置文件',ref:'参考文档',default:'其他'};
-      return'<div class="bar-row"><div class="bar-label">'+(names[label]||label)+'</div><div class="bar-track"><div class="bar-fill" style="width:'+pct+'%">'+count+'</div></div><div class="bar-count">'+pct+'%</div></div>';
+      return'<div class="bar-row"><div class="bar-label">'+(names[label]||label)+'</div><div class="bar-track"><div class="bar-fill" style="width:'+pct+'%"></div></div><div class="bar-count">'+pct+'%</div></div>';
     }).join('');
   }
   function heatListHTML(heat){
@@ -428,56 +448,103 @@ TEMPLATE = """<!doctype html>
   }
 
   /* --- Shelf --- */
+  let shelfMode='card', currentFilterIdx='', currentQuery='', shelfPages={};
+
+  function setShelfView(mode){
+    try{
+      shelfMode=mode;
+      const body=$('shelf-body');
+      if(body)body.classList.toggle('list-mode',mode==='list');
+      document.querySelectorAll('.vt-btn').forEach(b=>b.classList.toggle('active',b.dataset.mode===mode));
+      renderShelfBody();
+    }catch(e){console.error('setShelfView:',e);}
+  }
+
   function renderShelfNav(){
     try{
       const nav=$('shelf');
       let pills='<div class="nav-pill active" data-ci="">▦ 全部</div>';
       D.categories.forEach((c,i)=>{pills+='<div class="nav-pill" data-ci="'+i+'">'+CAT_ICON[i]+' '+esc(c.name)+' <b>'+c.count+'</b></div>';});
-      nav.innerHTML='<div class="shelf-nav">'+pills+'</div><div id="shelf-body"></div>';
+      nav.innerHTML='<div class="shelf-toolbar"><div class="view-toggle">'+
+        '<button class="vt-btn active" data-mode="card">🗂 卡片</button>'+
+        '<button class="vt-btn" data-mode="list">📋 列表</button>'+
+        '</div></div>'+
+        '<div class="shelf-nav">'+pills+'</div>'+
+        '<div id="shelf-body"></div>';
       nav.querySelectorAll('.nav-pill').forEach(pill=>{pill.onclick=()=>{
         nav.querySelectorAll('.nav-pill').forEach(x=>x.classList.remove('active'));
-        pill.classList.add('active');renderShelfBody(pill.dataset.ci);
+        pill.classList.add('active');currentFilterIdx=pill.dataset.ci;renderShelfBody();
       };});
+      nav.querySelectorAll('.vt-btn').forEach(b=>{b.onclick=()=>setShelfView(b.dataset.mode);});
     }catch(e){console.error('renderShelfNav:',e);}
   }
 
-  function renderShelfBody(filterIdx){
+  function renderShelfBody(){
     try{
       const body=$('shelf-body');if(!body)return;
-      const fi=filterIdx!==''?parseInt(filterIdx):null;let html='';
+      const fi=currentFilterIdx!==''?parseInt(currentFilterIdx):null;
+      const mode=shelfMode;
+      const PS=currentQuery?999999:(mode==='list'?10:12);
+      let html='';
       D.categories.forEach((cat,ci)=>{
         if(fi!==null&&ci!==fi)return;
-        const subs=cat.subs,total=Object.values(subs).reduce((a,b)=>a+b.length,0);
+        const subs=cat.subs;
+        let all=[];Object.entries(subs).forEach(([sn,parts])=>{parts.forEach(p=>all.push(Object.assign({},p,{'_sub':sn})));});
+        const total=all.length;
         if(!total)return;
-        let usedCount=0;Object.values(subs).forEach(ps=>ps.forEach(p=>{if(p.usage_count)usedCount++;}));
+        let usedCount=0;all.forEach(p=>{if(p.usage_count)usedCount++;});
         const usagePct=Math.round(usedCount/Math.max(total,1)*100);
-        let cols='';
-        Object.entries(subs).forEach(([sn,parts])=>{
-          cols+='<div class="sub-col"><div class="sub-col-head"><span class="dot" style="background:var(--c'+ci+')"></span>'+esc(sn)+'<span class="sub-col-col">'+parts.length+'</span></div><div class="sub-col-body">'+parts.map((p,i)=>cardHTML(p,i,ci)).join('')+'</div></div>';
-        });
+        const key=ci+':'+mode;
+        let pg=parseInt(shelfPages[key]||'1');if(isNaN(pg)||pg<1)pg=1;
+        const totalPages=Math.max(1,Math.ceil(total/PS));
+        if(pg>totalPages)pg=totalPages;shelfPages[key]=pg;
+        const start=(pg-1)*PS,pageItems=all.slice(start,start+PS);
+        let cardSec=mode==='card'?'<div class="shelf-cards">'+pageItems.map((p,i)=>cardHTML(p,i,ci)).join('')+'</div>':'';
+        let listSec=mode==='list'?('<div class="shelf-list"><table><thead><tr><th>零件</th><th>类型</th><th>子类</th><th>来源</th><th>使用</th></tr></thead><tbody>'+
+          pageItems.map(p=>'<tr class="list-row" data-id="'+esc(p.id)+'"><td class="lt-name">'+esc(p.name)+'</td><td>'+tcChip(cardType(p))+'</td><td>'+esc(p['_sub']||'')+'</td><td>'+esc(srcLabel[p.source_type||'initial'])+'</td><td><span class="use-tag">🔗 '+(p.usage_count||0)+'</span></td></tr>').join('')+
+          '</tbody></table></div>'):'';
+        const pager=currentQuery?'':('<div class="dept-pager" data-ci="'+ci+'">'+
+          '<button class="pg-btn" data-dir="-1"'+(pg<=1?' disabled':'')+'>‹ 上一页</button>'+
+          '<span class="pg-info">第 '+pg+' / '+totalPages+' 页</span>'+
+          '<button class="pg-btn" data-dir="1"'+(pg>=totalPages?' disabled':'')+'>下一页 ›</button>'+
+          '<span class="pg-all">共 '+total+' 个</span>'+
+          '</div>');
         html+='<div class="dept" data-ci="'+ci+'" style="--c:var(--c'+ci+')">'+
           '<div class="dept-head"><div class="dept-ico">'+CAT_ICON[ci]+'</div><h2>'+esc(cat.name)+'</h2><span class="cnt">'+total+' 个零件</span><div class="dept-arrow">▾</div></div>'+
-          '<div class="dept-bar" style="--usage:'+usagePct+'%"></div><div class="dept-body"><div class="sub-cols">'+cols+'</div></div></div>';
+          '<div class="dept-bar" style="--usage:'+usagePct+'%"></div>'+
+          '<div class="dept-body">'+(mode==='card'?cardSec:listSec)+pager+'</div></div>';
       });
       body.innerHTML=html||'<div class="empty">没有匹配的零件</div>';
       body.querySelectorAll('.dept-head').forEach(h=>h.onclick=()=>h.parentElement.classList.toggle('collapsed'));
       body.querySelectorAll('.card').forEach(c=>c.onclick=()=>showDetail(c.dataset.id));
+      body.querySelectorAll('.list-row').forEach(r=>r.onclick=()=>showDetail(r.dataset.id));
+      body.querySelectorAll('.pg-btn').forEach(b=>b.onclick=()=>{
+        const ci=parseInt(b.parentElement.dataset.ci);const dir=parseInt(b.dataset.dir);
+        const subs=D.categories[ci].subs;let tc=0;Object.values(subs).forEach(ps=>tc+=ps.length);
+        const TP=Math.max(1,Math.ceil(tc/(shelfMode==='list'?10:12)));
+        let np=parseInt(shelfPages[ci+':'+shelfMode]||'1')+dir;if(np<1)np=1;if(np>TP)np=TP;
+        shelfPages[ci+':'+shelfMode]=np;renderShelfBody();
+      });
     }catch(e){console.error('renderShelfBody:',e);}
   }
 
   function renderShelf(query){
-    renderShelfBody('');
-    if(query)document.querySelectorAll('#shelf-body .card').forEach(card=>{
-      const p=D.parts_by_id[card.dataset.id];
-      if(!p){card.style.display='none';return;}
-      const q=query.toLowerCase(),text=[p.name,p.description,p.category,p.sub_category,p.type,''].join(' ').toLowerCase();
-      card.style.display=text.includes(q)?'':'none';
-    });
+    currentQuery=query||'';
+    renderShelfBody();
+    if(currentQuery){
+      const q=currentQuery.toLowerCase();
+      document.querySelectorAll('#shelf-body .card, #shelf-body .list-row').forEach(el=>{
+        const p=D.parts_by_id[el.dataset.id];
+        if(!p){el.style.display='none';return;}
+        const text=[p.name,p.description,p.category,p.sub_category,p.type,''].join(' ').toLowerCase();
+        el.style.display=text.includes(q)?'':'none';
+      });
+    }
   }
 
   function cardHTML(p,i,ci){
     const ct=cardType(p),src=p.source_type||'initial',
-      head='<div class="chip">'+tcChip(ct)+'</div><div class="card-name">'+esc(p.name)+'</div>',
+      head='<div class="chip">'+tcChip(ct)+'</div><div class="card-name">'+esc(p.name)+'</div><div class="card-sub">'+esc(p['_sub']||'')+'</div>',
       foot='<div class="card-foot"><span class="use-tag">🔗 '+(p.usage_count||0)+'</span><span class="src-tag">'+esc(srcLabel[src])+'</span></div>',
       desc=p.description?'<div class="card-desc">'+esc(p.description)+'</div>':'';
 
@@ -584,7 +651,7 @@ TEMPLATE = """<!doctype html>
   });
 
   /* --- Init --- */
-  renderStats();renderDashboard();renderShelfNav();renderShelfBody('');renderGens();
+  renderStats();renderDashboard();renderShelfNav();renderShelfBody();renderGens();
 })();
 </script>
 </body>
