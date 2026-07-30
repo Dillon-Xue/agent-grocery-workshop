@@ -199,34 +199,39 @@ TEMPLATE = """<!doctype html>
     background:var(--solid);position:relative;overflow:hidden}
   .card:hover{transform:translateY(-3px) scale(1.01);border-color:var(--c,var(--accent));
     box-shadow:0 12px 30px color-mix(in srgb, var(--c,var(--accent)) 18%, transparent)}
-  .chip{position:absolute;top:8px;right:8px;font-size:10px;font-weight:700;padding:2px 8px;
+  .chip{position:absolute;top:6px;right:7px;font-size:9px;font-weight:700;padding:1px 7px;
     border-radius:10px;background:color-mix(in srgb, var(--c,var(--accent)) 15%, transparent);color:var(--c,var(--accent))}
-  .card-name{font-size:13px;font-weight:700;padding:8px 12px 2px;line-height:1.3}
-  .card-desc{font-size:11px;color:var(--muted);padding:0 12px 8px;line-height:1.45;display:-webkit-box;
-    -webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
-  .card-foot{display:flex;align-items:center;gap:8px;padding:6px 12px 10px;font-size:10px;color:var(--muted)}
+  .card-name{font-size:13px;font-weight:700;padding:6px 12px 1px;line-height:1.3;letter-spacing:.3px}
+  .card-desc{font-size:10.5px;color:var(--muted);padding:0 12px 6px;line-height:1.4;display:-webkit-box;
+    -webkit-line-clamp:1;-webkit-box-orient:vertical;overflow:hidden;transition:all .25s}
+  .card-foot{display:flex;align-items:center;gap:8px;padding:4px 12px 8px;font-size:10px;color:var(--muted);opacity:.55;transition:all .25s}
   .use-tag{background:color-mix(in srgb, var(--accent) 10%, transparent);color:var(--accent);
-    padding:1px 8px;border-radius:10px;font-weight:600}
-  .src-tag{background:var(--panel2);padding:1px 8px;border-radius:10px}
+    padding:1px 6px;border-radius:9px;font-weight:600}
+  .src-tag{background:var(--panel2);padding:1px 6px;border-radius:9px}
   .type-prompt .card-inner{border-left:3px solid var(--c,var(--c0));padding:10px 12px}
-  .type-prompt .quote{font-style:italic;color:var(--text2);font-size:11px;
-    padding:6px 10px;background:var(--panel2);border-radius:8px;margin-top:4px;
-    display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+  .type-prompt .quote{font-style:italic;color:var(--text2);font-size:10.5px;
+    padding:4px 10px;background:var(--panel2);border-radius:8px;margin-top:3px;
+    display:-webkit-box;-webkit-line-clamp:1;-webkit-box-orient:vertical;overflow:hidden;transition:all .25s}
   .type-python{font-family:"Cascadia Code","Fira Code","Source Code Pro",monospace}
   .type-python .win-bar{display:flex;align-items:center;gap:6px;padding:6px 10px;
     background:#0d1117;border-bottom:1px solid #30363d}
   .type-python .dot{width:9px;height:9px;border-radius:50%}
-  .type-python .code-preview{padding:8px 10px;font-size:11px;color:#8b949e;white-space:pre-wrap;
-    max-height:60px;overflow:hidden;line-height:1.5}
+  .type-python .code-preview{padding:6px 10px;font-size:10.5px;color:#8b949e;white-space:pre-wrap;
+    max-height:48px;overflow:hidden;line-height:1.45}
   .type-process .doc-icon{float:left;font-size:22px;margin:6px 10px 0 12px}
   .type-process .doc-path{font-size:10px;color:var(--muted);padding:4px 12px 0}
-  .type-process .steps{clear:both;padding:6px 12px 10px;font-size:11px;color:var(--text2);line-height:1.6}
+  .type-process .steps{clear:both;padding:4px 12px 8px;font-size:10.5px;color:var(--text2);line-height:1.5;
+    display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;transition:all .25s}
   .type-config .file-header{display:flex;align-items:center;gap:8px;padding:10px 12px}
   .type-config .file-icon{font-size:20px}
   .type-config .ext-badge{font-size:9px;font-weight:700;padding:2px 6px;border-radius:4px;
     background:var(--warn);color:#000;margin-left:auto}
   .type-ref .ref-mark{position:absolute;top:10px;right:10px;font-size:28px;opacity:.1;pointer-events:none}
   .type-ref .card-inner{border-left:3px solid var(--c5);padding:12px}
+  /* Card hover enhancements */
+  .card:hover .card-foot{opacity:1}
+  .card:hover .card-desc{-webkit-line-clamp:2}
+  .card:hover{z-index:2}
 
   /* Generations */
   .gen-list{max-height:520px;overflow-y:auto;padding-right:4px}
