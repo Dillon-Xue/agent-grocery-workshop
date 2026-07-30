@@ -63,23 +63,59 @@
 4. `generate_shop.py` 生成 `shop.html`：货架上「代码开发」类下「IMAP邮件读取模板」卡片标注「🔗 使用3次」，详情页可见「被以下 Skill 使用：周报汇总助手、邮件备份工具」及同源伙伴。
 
 ## 快速开始
+
+以下是在 WorkBuddy 中使用「零件杂货铺」的真实对话示例：
+
+---
+
+**你：** 帮我做一个 Skill，能自动把飞书群消息和邮件周报汇总成一份 Markdown 周报。
+
+**零件杂货铺：** 好的，我需要先澄清几个维度：
+
+1. **目标**：这个 Skill 的核心输出是什么？
+   **你：** 每周五自动生成一份 Markdown 周报，按「项目 / 进展 / 风险」分栏。
+
+2. **输入来源**：数据从哪来？
+   **你：** 飞书群消息（按 #周报 标签过滤）+ 邮件附件（含"周报"标题的）。
+
+3. **约束条件**：有技术或安全限制吗？
+   **你：** 必须纯本地运行，不能上传到外部服务器；飞书用 Open API，邮件用 IMAP。
+
+4. **输出格式**：除了 Markdown 还要别的吗？
+   **你：** 再同步发一条到钉钉群通知就行。
+
+> ✅ 需求已收敛 → 自动检索零件库…
+
+**零件杂货铺：** 从 6 大类 82 个零件中匹配到 **12 个**：
+
+| 类别 | 选用零件 | 用途 |
+|---|---|---|
+| 需求分析 | 约束检查模板、目标定义框架 | 固化需求结构 |
+| 设计 | 数据流设计、API选型评估 | 飞书+IMAP+钉钉三通道 |
+| 代码开发 | IMAP邮件读取模板、飞书OpenAPI封装、Markdown生成器 | 核心逻辑 |
+| 工具 | 定时任务调度器 | 每周五自动触发 |
+| 参考 | 周报模板规范 | 输出格式 |
+
+⚠️ **冲突检测**：「HTTP请求封装v1」与「HTTP请求封装v2」互斥 → 已自动选中 v2（更新版），跳过项已记录说明。
+📦 **依赖补全**：自动追加「环境变量配置模板」（IMAP密码等敏感信息所需）。
+
+---
+
+**你：** 就按这些组装吧。
+
+**零件杂货铺：** 已完成：
+
+- ✅ 生成 `generations/gen_weekly_report/` — 含 SKILL.md + manifest.json
+- ✅ 自动拆解回填 5 个新零件入库（周报解析器、钉钉Webhook通知等）
+- ✅ 生成 `shop.html` 解剖图 — 打开即可看到新生成的 Skill 及其全部零件构成
+
 ```bash
-# 1. 初始化零件库
-python scripts/seed_initial_parts.py .
-
-# 2. 把模糊需求写成 requirements.json 后组装
-python scripts/assemble.py . requirements.json
-
-# 3. 生成解剖图并在浏览器/预览面板打开
+# 以上全流程由 skill 自动驱动，无需手动执行命令
+# 如需单独重新生成解剖图：
 python scripts/generate_shop.py .
 ```
 
-## 测试
-核心逻辑（检索 / 冲突 / 依赖 / 反向关联 / 同源 / 渲染 / 拆解 / 种子）均覆盖自动化测试，运行：
-```bash
-python -m pytest tests -q
-```
+---
 
-## 目录约定
-- 类别中文写在每个零件 JSON 的 `category` 字段；磁盘子目录用 ASCII（requirements/design/coding/testing/tools/reference）以避免跨平台编码问题。
-- 零件 JSON 字段：`id / name / description / category / sub_category / type / content / content_format / version / source_type / source_skill_id / source_skill_name / metadata / depends_on / conflicts_with`。
+> 💡 **核心体验**：你说需求 → 我问清楚 → 自动挑零件 → 组装出新 Skill → 拆解回填让零件库更富 → 下次组装选择更多。越用越强。
+
