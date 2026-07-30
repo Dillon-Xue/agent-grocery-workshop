@@ -1,0 +1,21 @@
+{
+  "id": "part_req_004",
+  "name": "目标定义模板",
+  "category": "需求分析",
+  "sub_category": "目标定义",
+  "type": "Prompt片段",
+  "description": "用 SMART 原则引导定义目标",
+  "content": "把目标改写成 SMART：具体(Specific)、可衡量(Measurable)、可达成(Achievable)、相关(Relevant)、有时限(Time-bound)。逐项追问用户补全。",
+  "source_type": "initial",
+  "metadata": {
+    "tags": [
+      "SMART",
+      "目标"
+    ],
+    "author": "initial-pack"
+  },
+  "version": "v1.0",
+  "content_format": "text",
+  "depends_on": [],
+  "conflicts_with": []
+}

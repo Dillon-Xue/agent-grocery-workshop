@@ -1,0 +1,20 @@
+{
+  "id": "part_tst_002",
+  "name": "测试数据构造模板",
+  "category": "测试用例",
+  "sub_category": "数据构造",
+  "type": "Python代码片段",
+  "description": "模拟数据生成",
+  "content": "import dataclasses\n\ndef make_sample(**overrides):\n    base = {'id': 1, 'name': 'sample'}\n    base.update(overrides)\n    return base",
+  "content_format": "python",
+  "source_type": "initial",
+  "metadata": {
+    "tags": [
+      "fixture"
+    ],
+    "author": "initial-pack"
+  },
+  "version": "v1.0",
+  "depends_on": [],
+  "conflicts_with": []
+}

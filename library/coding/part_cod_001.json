@@ -1,0 +1,21 @@
+{
+  "id": "part_cod_001",
+  "name": "requests库调用模板",
+  "category": "代码开发",
+  "sub_category": "HTTP调用",
+  "type": "Python代码片段",
+  "description": "带超时与重试的 HTTP 请求封装",
+  "content": "import requests\n\ndef http_get(url, timeout=10, headers=None):\n    resp = requests.get(url, timeout=timeout, headers=headers)\n    resp.raise_for_status()\n    return resp.json()",
+  "content_format": "python",
+  "source_type": "initial",
+  "metadata": {
+    "tags": [
+      "http",
+      "requests"
+    ],
+    "author": "initial-pack"
+  },
+  "version": "v1.0",
+  "depends_on": [],
+  "conflicts_with": []
+}

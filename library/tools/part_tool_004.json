@@ -1,0 +1,20 @@
+{
+  "id": "part_tool_004",
+  "name": "Git工作流规范",
+  "category": "依赖工具",
+  "sub_category": "版本控制",
+  "type": "参考文档",
+  "description": "版本控制最佳实践",
+  "content": "main 受保护；功能走 feature/* 分支；提交信息用『动词 对象』；合并前跑测试；禁止 --no-verify 跳过钩子。",
+  "source_type": "initial",
+  "metadata": {
+    "tags": [
+      "git"
+    ],
+    "author": "initial-pack"
+  },
+  "version": "v1.0",
+  "content_format": "text",
+  "depends_on": [],
+  "conflicts_with": []
+}

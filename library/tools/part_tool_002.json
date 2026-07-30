@@ -1,0 +1,20 @@
+{
+  "id": "part_tool_002",
+  "name": "requirements模板",
+  "category": "依赖工具",
+  "sub_category": "依赖",
+  "type": "配置文件",
+  "description": "依赖清单格式",
+  "content": "requests>=2.31.0\npytest>=8.0.0\n",
+  "content_format": "yaml",
+  "source_type": "initial",
+  "metadata": {
+    "tags": [
+      "pip"
+    ],
+    "author": "initial-pack"
+  },
+  "version": "v1.0",
+  "depends_on": [],
+  "conflicts_with": []
+}

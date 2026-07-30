@@ -1,0 +1,20 @@
+{
+  "id": "part_tool_001",
+  "name": "Python虚拟环境配置",
+  "category": "依赖工具",
+  "sub_category": "环境",
+  "type": "配置文件",
+  "description": "venv 创建与激活",
+  "content": "python -m venv .venv\nsource .venv/bin/activate  # Windows: .venv\\Scripts\\activate",
+  "content_format": "yaml",
+  "source_type": "initial",
+  "metadata": {
+    "tags": [
+      "venv"
+    ],
+    "author": "initial-pack"
+  },
+  "version": "v1.0",
+  "depends_on": [],
+  "conflicts_with": []
+}

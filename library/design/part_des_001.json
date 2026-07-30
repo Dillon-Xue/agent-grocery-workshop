@@ -1,0 +1,21 @@
+{
+  "id": "part_des_001",
+  "name": "技术选型决策树",
+  "category": "方案设计",
+  "sub_category": "技术选型",
+  "type": "流程规范",
+  "description": "根据需求推荐技术栈的决策树",
+  "content": "Q1 是否需要 UI？是→前端栈；否→CLI/脚本。Q2 是否重 IO？是→异步框架。Q3 是否需持久化？是→SQLite/轻库。每次只沿一条分支深入，给出理由。",
+  "source_type": "initial",
+  "metadata": {
+    "tags": [
+      "选型",
+      "决策"
+    ],
+    "author": "initial-pack"
+  },
+  "version": "v1.0",
+  "content_format": "text",
+  "depends_on": [],
+  "conflicts_with": []
+}

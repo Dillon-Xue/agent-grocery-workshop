@@ -1,0 +1,20 @@
+{
+  "id": "part_tst_001",
+  "name": "pytest基础模板",
+  "category": "测试用例",
+  "sub_category": "单测",
+  "type": "Python代码片段",
+  "description": "单元测试框架骨架",
+  "content": "def test_example():\n    assert 1 + 1 == 2\n\ndef test_raises():\n    import pytest\n    with pytest.raises(ValueError):\n        int('x')",
+  "content_format": "python",
+  "source_type": "initial",
+  "metadata": {
+    "tags": [
+      "pytest"
+    ],
+    "author": "initial-pack"
+  },
+  "version": "v1.0",
+  "depends_on": [],
+  "conflicts_with": []
+}

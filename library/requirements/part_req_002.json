@@ -1,0 +1,21 @@
+{
+  "id": "part_req_002",
+  "name": "场景分析框架",
+  "category": "需求分析",
+  "sub_category": "场景拆解",
+  "type": "流程规范",
+  "description": "把用户模糊想法拆成具体使用场景的方法",
+  "content": "步骤：1) 列出所有潜在使用者角色；2) 对每个角色写出『在什么情况下、要完成什么、当前痛点是什么』；3) 按频次与价值排序，挑出 Top3 场景优先实现。",
+  "source_type": "initial",
+  "metadata": {
+    "tags": [
+      "场景",
+      "拆解"
+    ],
+    "author": "initial-pack"
+  },
+  "version": "v1.0",
+  "content_format": "text",
+  "depends_on": [],
+  "conflicts_with": []
+}

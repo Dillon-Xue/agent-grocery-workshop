@@ -1,0 +1,21 @@
+{
+  "id": "part_req_005",
+  "name": "约束条件清单",
+  "category": "需求分析",
+  "sub_category": "约束检查",
+  "type": "流程规范",
+  "description": "技术/资源/时间约束检查清单",
+  "content": "检查项：运行环境(本地/云端)、鉴权方式、数据隐私边界、第三方依赖是否可联网、交付时间窗、是否需要多人协作。任一项不确定都要向用户确认。",
+  "source_type": "initial",
+  "metadata": {
+    "tags": [
+      "约束",
+      "边界"
+    ],
+    "author": "initial-pack"
+  },
+  "version": "v1.0",
+  "content_format": "text",
+  "depends_on": [],
+  "conflicts_with": []
+}

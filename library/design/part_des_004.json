@@ -1,0 +1,21 @@
+{
+  "id": "part_des_004",
+  "name": "数据模型设计模板",
+  "category": "方案设计",
+  "sub_category": "数据建模",
+  "type": "参考文档",
+  "description": "实体关系设计指南",
+  "content": "列出实体 → 标注字段与类型 → 标注实体间关系(1:1/1:N/N:N) → 写出建表/建类语句草稿 → 检查冗余与范式。",
+  "source_type": "initial",
+  "metadata": {
+    "tags": [
+      "数据模型",
+      "ER"
+    ],
+    "author": "initial-pack"
+  },
+  "version": "v1.0",
+  "content_format": "text",
+  "depends_on": [],
+  "conflicts_with": []
+}

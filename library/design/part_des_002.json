@@ -1,0 +1,21 @@
+{
+  "id": "part_des_002",
+  "name": "架构设计模板",
+  "category": "方案设计",
+  "sub_category": "模块划分",
+  "type": "流程规范",
+  "description": "模块划分与数据流设计模板",
+  "content": "# 架构\n- 输入：\n- 处理模块：\n- 输出：\n- 数据流：输入 → 模块A → 模块B → 输出\n- 异常路径：",
+  "source_type": "initial",
+  "metadata": {
+    "tags": [
+      "架构",
+      "模块"
+    ],
+    "author": "initial-pack"
+  },
+  "version": "v1.0",
+  "content_format": "text",
+  "depends_on": [],
+  "conflicts_with": []
+}

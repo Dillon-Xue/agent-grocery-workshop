@@ -1,0 +1,20 @@
+{
+  "id": "part_cod_006",
+  "name": "日期格式化模板",
+  "category": "代码开发",
+  "sub_category": "时间",
+  "type": "Python代码片段",
+  "description": "datetime 统一处理",
+  "content": "from datetime import datetime\n\ndef now_str(fmt='%Y-%m-%d %H:%M:%S'):\n    return datetime.now().strftime(fmt)\n\ndef parse(s, fmt='%Y-%m-%d'):\n    return datetime.strptime(s, fmt)",
+  "content_format": "python",
+  "source_type": "initial",
+  "metadata": {
+    "tags": [
+      "datetime"
+    ],
+    "author": "initial-pack"
+  },
+  "version": "v1.0",
+  "depends_on": [],
+  "conflicts_with": []
+}

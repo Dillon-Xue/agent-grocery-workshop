@@ -1,0 +1,20 @@
+{
+  "id": "part_tst_003",
+  "name": "集成测试模板",
+  "category": "测试用例",
+  "sub_category": "联调",
+  "type": "流程规范",
+  "description": "多模块联调方案",
+  "content": "准备环境 → 灌入测试数据 → 依次调用模块A/B/C → 校验最终状态 → 清理。每个步骤失败立即中断并保留现场日志。",
+  "source_type": "initial",
+  "metadata": {
+    "tags": [
+      "integration"
+    ],
+    "author": "initial-pack"
+  },
+  "version": "v1.0",
+  "content_format": "text",
+  "depends_on": [],
+  "conflicts_with": []
+}

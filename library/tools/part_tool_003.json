@@ -1,0 +1,20 @@
+{
+  "id": "part_tool_003",
+  "name": "Docker基础配置",
+  "category": "依赖工具",
+  "sub_category": "容器",
+  "type": "配置文件",
+  "description": "最小 Python 镜像 Dockerfile",
+  "content": "FROM python:3.11-slim\nWORKDIR /app\nCOPY . .\nRUN pip install -r requirements.txt\nCMD [\"python\", \"main.py\"]",
+  "content_format": "yaml",
+  "source_type": "initial",
+  "metadata": {
+    "tags": [
+      "docker"
+    ],
+    "author": "initial-pack"
+  },
+  "version": "v1.0",
+  "depends_on": [],
+  "conflicts_with": []
+}

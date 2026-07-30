@@ -1,0 +1,21 @@
+{
+  "id": "part_ref_001",
+  "name": "Skill开发最佳实践",
+  "category": "参考文档",
+  "sub_category": "通用",
+  "type": "参考文档",
+  "description": "通用 Skill 开发指南",
+  "content": "SKILL.md 第一行为名称；用 YAML frontmatter 写 description/metadata；步骤用有序列表；脚本放 scripts/；避免写死绝对路径；说明触发场景与示例。",
+  "source_type": "initial",
+  "metadata": {
+    "tags": [
+      "skill",
+      "best-practice"
+    ],
+    "author": "initial-pack"
+  },
+  "version": "v1.0",
+  "content_format": "text",
+  "depends_on": [],
+  "conflicts_with": []
+}

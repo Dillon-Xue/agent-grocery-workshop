@@ -1,0 +1,21 @@
+{
+  "id": "part_cod_002",
+  "name": "文件读写模板",
+  "category": "代码开发",
+  "sub_category": "本地IO",
+  "type": "Python代码片段",
+  "description": "本地文件安全读写",
+  "content": "def read_text(path):\n    with open(path, 'r', encoding='utf-8') as f:\n        return f.read()\n\ndef write_text(path, text):\n    import os\n    os.makedirs(os.path.dirname(path), exist_ok=True)\n    with open(path, 'w', encoding='utf-8') as f:\n        f.write(text)",
+  "content_format": "python",
+  "source_type": "initial",
+  "metadata": {
+    "tags": [
+      "io",
+      "文件"
+    ],
+    "author": "initial-pack"
+  },
+  "version": "v1.0",
+  "depends_on": [],
+  "conflicts_with": []
+}

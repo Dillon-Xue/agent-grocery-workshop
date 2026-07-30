@@ -1,0 +1,21 @@
+{
+  "id": "part_des_003",
+  "name": "API设计规范",
+  "category": "方案设计",
+  "sub_category": "接口规范",
+  "type": "参考文档",
+  "description": "RESTful API 设计标准参考",
+  "content": "资源用名词复数；GET 读、POST 建、PUT 全量改、PATCH 局部改、DELETE 删；路径用 kebab-case；错误统一 {code,message}；分页用 ?page&size。",
+  "source_type": "initial",
+  "metadata": {
+    "tags": [
+      "API",
+      "REST"
+    ],
+    "author": "initial-pack"
+  },
+  "version": "v1.0",
+  "content_format": "text",
+  "depends_on": [],
+  "conflicts_with": []
+}

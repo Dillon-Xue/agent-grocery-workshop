@@ -1,0 +1,20 @@
+{
+  "id": "part_cod_005",
+  "name": "错误处理模板",
+  "category": "代码开发",
+  "sub_category": "异常",
+  "type": "Python代码片段",
+  "description": "try-except 封装与友好报错",
+  "content": "def safe_run(fn, *args, **kwargs):\n    try:\n        return fn(*args, **kwargs)\n    except FileNotFoundError as e:\n        log.error('文件缺失: %s', e)\n    except Exception as e:\n        log.exception('未预期错误')\n    return None",
+  "content_format": "python",
+  "source_type": "initial",
+  "metadata": {
+    "tags": [
+      "error"
+    ],
+    "author": "initial-pack"
+  },
+  "version": "v1.0",
+  "depends_on": [],
+  "conflicts_with": []
+}

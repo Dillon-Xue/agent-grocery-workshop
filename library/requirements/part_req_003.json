@@ -1,0 +1,21 @@
+{
+  "id": "part_req_003",
+  "name": "痛点识别模板",
+  "category": "需求分析",
+  "sub_category": "痛点挖掘",
+  "type": "Prompt片段",
+  "description": "引导用户描述当前痛点的 Prompt",
+  "content": "请描述：你现在是怎么解决这个问题的？最花时间/最容易出错的环节是什么？如果完美解决，会带来什么量化收益？",
+  "source_type": "initial",
+  "metadata": {
+    "tags": [
+      "痛点",
+      "访谈"
+    ],
+    "author": "initial-pack"
+  },
+  "version": "v1.0",
+  "content_format": "text",
+  "depends_on": [],
+  "conflicts_with": []
+}

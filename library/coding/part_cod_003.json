@@ -1,0 +1,20 @@
+{
+  "id": "part_cod_003",
+  "name": "JSON处理模板",
+  "category": "代码开发",
+  "sub_category": "序列化",
+  "type": "Python代码片段",
+  "description": "JSON 序列化/反序列化",
+  "content": "import json\n\ndef dump_json(obj, path):\n    with open(path, 'w', encoding='utf-8') as f:\n        json.dump(obj, f, ensure_ascii=False, indent=2)\n\ndef load_json(path):\n    with open(path, 'r', encoding='utf-8') as f:\n        return json.load(f)",
+  "content_format": "python",
+  "source_type": "initial",
+  "metadata": {
+    "tags": [
+      "json"
+    ],
+    "author": "initial-pack"
+  },
+  "version": "v1.0",
+  "depends_on": [],
+  "conflicts_with": []
+}
