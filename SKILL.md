@@ -1,6 +1,7 @@
 ---
 name: 零件杂货铺 (Grocery Workshop)
 description: Agent 零件管理与 Skill 自动组装。通过多轮澄清需求、从零件库检索匹配、冲突二选一+依赖补全，自动拼装新 Skill，并以自包含 HTML「解剖图」可视化全部零件与生成记录。适合想看清并积累自己 Agent 构成的开发者/产品经理。
+agent_created: true
 ---
 
 # 零件杂货铺 (Grocery Workshop)
