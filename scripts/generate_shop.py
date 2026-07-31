@@ -126,13 +126,13 @@ TEMPLATE = """<!doctype html>
   .donut-legend{display:flex;flex-direction:column;gap:5px}
   .dl-item{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--text2);padding:2px 0;justify-content:flex-start}
   .dl-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
-  .bar-list{display:flex;flex-direction:column;gap:10px}
-  .bar-row{display:flex;align-items:center;gap:8px;font-size:14px}
-  .bar-label{width:80px;flex-shrink:0;color:var(--text2);font-weight:600}
-  .bar-track{flex:1;height:24px;background:rgba(0,0,0,.15);border-radius:12px;overflow:hidden}
-  .bar-fill{height:100%;border-radius:12px;font-size:12px;color:#fff;padding:0 10px;
-    display:flex;align-items:center;white-space:nowrap;min-width:28px;justify-content:flex-end}
-  .bar-count{width:42px;text-align:right;color:var(--muted);font-size:13px}
+  .bar-list{display:flex;flex-direction:column;gap:14px;padding:4px 0}
+  .bar-row{display:flex;align-items:center;gap:10px;font-size:13px}
+  .bar-label{width:76px;flex-shrink:0;color:var(--text2);font-weight:600}
+  .bar-track{flex:1;height:16px;background:rgba(0,0,0,.12);border-radius:8px;overflow:hidden}
+  .bar-fill{height:100%;border-radius:8px;background:linear-gradient(90deg,var(--accent),#6eb9ff);
+    display:flex;align-items:center;white-space:nowrap;min-width:24px;justify-content:flex-end}
+  .bar-count{width:40px;text-align:right;color:var(--muted);font-size:12px;flex-shrink:0}
   .heat-list{list-style:none;padding:0;margin:0}
   .heat-item{display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid var(--border)}
   .heat-rank{width:24px;height:24px;border-radius:6px;display:grid;place-items:center;
@@ -271,6 +271,22 @@ TEMPLATE = """<!doctype html>
   .gen-parts a:hover{text-decoration:underline}
   .gen-notes{margin-top:10px;font-size:11px;color:var(--muted);font-style:italic;padding:8px 12px;
     background:var(--panel2);border-radius:var(--r2)}
+  /* Gen timeline & basis */
+  .gen-timeline{margin-top:12px;padding:0 0 0 18px;border-left:2px solid var(--border)}
+  .gen-tl-item{position:relative;padding:6px 0 6px 16px;font-size:11.5px;color:var(--text2);line-height:1.6}
+  .gen-tl-item::before{content:'';position:absolute;left:-7px;top:14px;width:10px;height:10px;border-radius:50%;
+    background:var(--border);border:2px solid var(--bg2)}
+  .gen-tl-item:first-child::before{background:var(--accent);border-color:var(--accent)}
+  .gen-tl-item:last-child::before{background:var(--good);border-color:var(--good)}
+  .gen-tl-time{font-size:10px;color:var(--muted);display:block}
+  .gen-basis{margin-top:12px;font-size:11.5px;line-height:1.7}
+  .gen-basis-title{font-weight:700;color:var(--text);margin-bottom:4px;display:flex;align-items:center;gap:4px}
+  .gen-basis-row{display:flex;align-items:baseline;gap:6px;padding:3px 0;
+    border-bottom:1px dashed var(--border)}
+  .gen-basis-cat{font-size:10px;background:var(--panel2);padding:1px 8px;border-radius:10px;
+    color:var(--muted);white-space:nowrap;flex-shrink:0}
+  .gen-basis-part{color:var(--accent);cursor:pointer;font-weight:600;font-size:11.5px}
+  .gen-basis-part:hover{text-decoration:underline}
 
   /* Detail drawer */
   .overlay{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:100;
@@ -586,15 +602,38 @@ TEMPLATE = """<!doctype html>
       D.generations.forEach(g=>{
         const dotColor=g.auto_dismantled?'var(--good)':'var(--accent)';
         const partsHtml=(g.used_part_ids||[]).map(pid=>{const p=D.parts_by_id[pid];return p?'<a data-id="'+pid+'">'+esc(p.name)+'</a>':esc(pid);}).join(' · ');
+        /* --- 选择依据：按大类分组 --- */
+        const catGroups={};
+        (g.used_part_ids||[]).forEach(pid=>{const p=D.parts_by_id[pid];if(!p)return;const c=p.category||'其他';(catGroups[c]=catGroups[c]||[]).push(p);});
+        let basisHtml='';
+        if(Object.keys(catGroups).length){
+          basisHtml='<div class="gen-basis"><div class="gen-basis-title">🎯 选择依据</div>';
+          Object.entries(catGroups).forEach(([cat,ps])=>{
+            basisHtml+='<div class="gen-basis-row"><span class="gen-basis-cat">'+esc(cat)+'</span>'+
+              ps.map(p=>'<span class="gen-basis-part" data-id="'+esc(p.id)+'">'+esc(p.name)+'</span>').join(' · ')+'</div>';
+          });
+          basisHtml+='<div style="margin-top:6px;font-size:10.5px;color:var(--muted)">基于需求语义匹配，从 '+Object.keys(catGroups).length+' 个分类中检索到 '+(g.used_part_ids?g.used_part_ids.length:0)+' 个匹配零件。</div></div>';
+        }
+        /* --- 时间线 --- */
+        const nParts=g.used_part_ids?g.used_part_ids.length:0;
+        const tl='<div class="gen-timeline">'+
+          '<div class="gen-tl-item"><b>📝 需求提出</b><span class="gen-tl-time">'+esc(g.initial_query||g.name)+'</span></div>'+
+          '<div class="gen-tl-item"><b>🔍 零件检索</b><span class="gen-tl-time">命中 <b>'+nParts+'</b> 个匹配零件，无冲突</span></div>'+
+          '<div class="gen-tl-item"><b>🔧 组装确认</b><span class="gen-tl-time">'+esc(g.created_at||'')+' · 零件直接可用</span></div>'+
+          (g.auto_dismantled?'<div class="gen-tl-item"><b>♻️ 自动拆解回填</b><span class="gen-tl-time">拆出候选零件并入库</span></div>':'')+
+          '</div>';
+
         html+='<div class="gen-card"><div class="gen-head"><div class="gen-dot" style="background:'+dotColor+'"></div>'+
           '<h3>'+esc(g.name)+'</h3><div class="gen-meta"><span>'+esc(g.created_at||'')+'</span><span>'+(g.used_part_ids?g.used_part_ids.length:0)+' 个零件</span>'+
           (g.auto_dismantled?'<span style="color:var(--good)">✅ 已回填</span>':'')+'</div></div>'+
-          '<div class="gen-body">'+(partsHtml?'<div class="gen-parts">📎 物料清单：'+partsHtml+'</div>':'')+
+          '<div class="gen-body">'+tl+
+          (partsHtml?'<div class="gen-parts" style="margin-top:10px">📎 物料清单：'+partsHtml+'</div>':'')+
+          basisHtml+
           (g.notes?'<div class="gen-notes">'+esc(g.notes)+'</div>':'')+'</div></div>';
       });
       el.innerHTML='<div class="gen-list">'+html+'</div>';
       el.querySelectorAll('.gen-head').forEach(h=>h.onclick=()=>h.parentElement.classList.toggle('open'));
-      el.querySelectorAll('.gen-parts [data-id]').forEach(a=>a.onclick=e=>{e.stopPropagation();showDetail(a.dataset.id);});
+      el.querySelectorAll('.gen-parts [data-id], .gen-basis-part[data-id]').forEach(a=>a.onclick=e=>{e.stopPropagation();showDetail(a.dataset.id);});
     }catch(e){console.error('renderGens:',e);}
   }
 
