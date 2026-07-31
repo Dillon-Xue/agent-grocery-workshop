@@ -93,22 +93,32 @@ TEMPLATE = """<!doctype html>
   .htitle h1{font-size:22px;font-weight:800;background:linear-gradient(90deg,var(--c0),var(--c1),var(--c2));
     -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
   .htitle p{font-size:12px;color:var(--muted);margin-top:2px}
-  .stats-row{display:flex;gap:12px;margin-left:auto}
+  .stats-row{display:flex;gap:12px;margin-left:auto;align-items:center}
   .stat-pill{background:var(--panel);border:1px solid var(--border);border-radius:var(--r);
     padding:8px 16px;text-align:center;min-width:90px}
   .stat-pill b{display:block;font-size:20px;color:var(--accent);font-weight:800}
   .stat-pill small{font-size:11px;color:var(--muted)}
+  .stat-pill.conn{display:flex;align-items:center;gap:8px;min-width:auto;
+    background:rgba(0,230,118,.08);border-color:rgba(0,230,118,.25)}
+  .stat-pill.conn small{color:var(--good);font-weight:600}
+  .conn-dot{width:10px;height:10px;border-radius:50%;background:var(--good);
+    box-shadow:0 0 0 0 rgba(0,230,118,.6);animation:pulse 2s infinite}
+  @keyframes pulse{0%{box-shadow:0 0 0 0 rgba(0,230,118,.5)}70%{box-shadow:0 0 0 7px rgba(0,230,118,0)}100%{box-shadow:0 0 0 0 rgba(0,230,118,0)}}
   .nav{padding:0 32px;display:flex;align-items:center;gap:6px}
   .tab{padding:8px 18px;border-radius:var(--r2);cursor:pointer;font-size:13px;font-weight:600;
     color:var(--muted);background:transparent;border:1px solid transparent;transition:.2s}
   .tab:hover{color:var(--text);background:var(--panel)}
   .tab.active{color:var(--accent);background:rgba(0,212,255,.08);border-color:rgba(0,212,255,.18);
     box-shadow:0 0 12px rgba(0,212,255,.1)}
-  .search-wrap{margin-left:auto}
+  .nav-actions{margin-left:auto;display:flex;align-items:center;gap:10px}
+  .nav-btn{padding:7px 14px;border-radius:20px;border:1px solid rgba(168,85,247,.3);
+    background:rgba(168,85,247,.12);color:var(--c1);font-size:13px;font-weight:600;cursor:pointer;transition:.2s}
+  .nav-btn:hover{background:rgba(168,85,247,.2);box-shadow:0 0 12px rgba(168,85,247,.2)}
+  .search-wrap{position:relative;display:flex;align-items:center}
+  .search-icon{position:absolute;left:11px;font-size:13px;opacity:.6;pointer-events:none}
   .search{padding:7px 14px 7px 32px;border-radius:20px;border:1px solid var(--border);
     background:var(--solid);color:var(--text);font-size:13px;width:220px;outline:none;transition:.2s}
   .search:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(0,212,255,.12)}
-  .search-icon{position:relative;left:-198px;color:var(--muted);pointer-events:none}
   .main{padding:20px 32px 40px}
 
   /* Dashboard */
@@ -184,6 +194,11 @@ TEMPLATE = """<!doctype html>
   .dept-body{padding:12px 14px 16px}
   .dept.collapsed .dept-body{display:none}
   /* Shelf toolbar + view toggle */
+  .shelf-head{display:flex;align-items:center;gap:12px;margin-bottom:14px}
+  .shelf-title{font-size:18px;font-weight:800;flex:1}
+  .shelf-add{padding:8px 16px;border-radius:20px;border:1px solid rgba(0,230,118,.3);
+    background:rgba(0,230,118,.12);color:var(--good);font-size:13px;font-weight:700;cursor:pointer;transition:.2s}
+  .shelf-add:hover{background:rgba(0,230,118,.2);box-shadow:0 0 12px rgba(0,230,118,.2)}
   .shelf-toolbar{display:flex;align-items:center;justify-content:flex-start;gap:8px;margin-bottom:14px}
   .view-toggle{display:inline-flex;border:1px solid var(--border);border-radius:20px;overflow:hidden;background:var(--panel)}
   .vt-btn{padding:6px 16px;border:none;background:transparent;color:var(--muted);font-size:12px;font-weight:600;cursor:pointer;transition:.2s}
@@ -288,6 +303,23 @@ TEMPLATE = """<!doctype html>
   .gen-basis-part{color:var(--accent);cursor:pointer;font-weight:600;font-size:11.5px}
   .gen-basis-part:hover{text-decoration:underline}
 
+  /* Dismantle tasks (5.4) */
+  .dsm-head{display:flex;align-items:center;gap:12px;margin-bottom:14px}
+  .dsm-list{display:flex;flex-direction:column;gap:12px}
+  .dsm-card{display:flex;align-items:center;gap:14px;padding:14px 18px;border:1px solid var(--border);
+    border-radius:var(--r);background:var(--panel);transition:.2s}
+  .dsm-card.done{border-left:3px solid var(--good)}
+  .dsm-card.proc{border-left:3px solid var(--warn)}
+  .dsm-ico{font-size:20px;flex-shrink:0}
+  .dsm-main{flex:1;min-width:0}
+  .dsm-name{font-size:14px;font-weight:700}
+  .dsm-sub{font-size:11px;color:var(--muted);margin-top:2px}
+  .dsm-status{font-size:12px;font-weight:700;flex-shrink:0}
+  .dsm-card.done .dsm-status{color:var(--good)}
+  .dsm-card.proc .dsm-status{color:var(--warn)}
+  .dsm-out{font-size:12px;color:var(--text2);flex-shrink:0;min-width:70px;text-align:right}
+  .dsm-out b{color:var(--accent);font-size:15px}
+
   /* Detail drawer */
   .overlay{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:100;
     opacity:0;pointer-events:none;transition:.25s;backdrop-filter:blur(4px)}
@@ -306,6 +338,41 @@ TEMPLATE = """<!doctype html>
   .badge.src-initial{background:rgba(0,230,118,.1);color:var(--good)}
   .badge.src-dismantled{background:rgba(255,171,0,.1);color:var(--warn)}
   .badge.src-auto_generated{background:rgba(168,85,247,.1);color:var(--c1)}
+
+  /* New Skill / Task modals (5.6 / 5.4) */
+  .ns-modal{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%) scale(.96);
+    width:560px;max-width:94vw;max-height:86vh;overflow:hidden;display:flex;flex-direction:column;
+    background:var(--bg2);border:1px solid var(--border);border-radius:var(--r);z-index:102;
+    box-shadow:0 20px 60px rgba(0,0,0,.45);transition:.25s;opacity:0}
+  .overlay.show .ns-modal{transform:translate(-50%,-50%) scale(1);opacity:1}
+  .ns-head{display:flex;align-items:center;justify-content:space-between;padding:14px 18px;
+    border-bottom:1px solid var(--border);font-size:15px;font-weight:700}
+  .ns-close{font-size:12px;color:var(--muted);cursor:pointer;font-weight:600}
+  .ns-close:hover{color:var(--bad)}
+  .ns-body{flex:1;overflow-y:auto;padding:18px;display:flex;flex-direction:column;gap:12px}
+  .ns-msg{max-width:82%;padding:10px 14px;border-radius:14px;font-size:13px;line-height:1.6;animation:fadeUp .25s both}
+  .ns-msg.you{align-self:flex-end;background:linear-gradient(135deg,var(--c0),var(--c1));color:#fff;border-bottom-right-radius:4px}
+  .ns-msg.boss{align-self:flex-start;background:var(--panel);border:1px solid var(--border);color:var(--text);border-bottom-left-radius:4px}
+  .ns-msg.boss b{color:var(--accent)}
+  .ns-progress{padding:10px 18px;border-top:1px solid var(--border)}
+  .ns-pb-label{font-size:11px;color:var(--muted);margin-bottom:6px}
+  .ns-bar{height:8px;background:var(--panel);border-radius:6px;overflow:hidden}
+  .ns-bar-fill{height:100%;background:linear-gradient(90deg,var(--accent),var(--c2));border-radius:6px;transition:width .4s}
+  .ns-input{display:flex;gap:8px;padding:12px 18px;border-top:1px solid var(--border)}
+  .ns-input input{flex:1;padding:9px 14px;border-radius:20px;border:1px solid var(--border);
+    background:var(--solid);color:var(--text);font-size:13px;outline:none}
+  .ns-input button{padding:9px 20px;border-radius:20px;border:none;background:var(--c0);color:#fff;
+    font-size:13px;font-weight:700;cursor:pointer}
+  .ns-input button:hover{filter:brightness(1.1)}
+  /* Task modal */
+  .tk-modal{width:460px}
+  .tk-body{padding:18px;font-size:13px;color:var(--text2);line-height:1.7}
+  .tk-body pre{background:#0d1117;border:1px solid var(--border);border-radius:var(--r2);padding:12px;
+    font-size:12px;overflow-x:auto;margin:10px 0;color:#8b949e}
+  .tk-body code{font-family:"Cascadia Code","Fira Code",monospace}
+  .tk-list{list-style:none;padding:0;margin:10px 0;display:flex;flex-direction:column;gap:6px}
+  .tk-list li{font-size:12px}
+  .tk-hint{font-size:11px;color:var(--muted);margin-top:10px;font-style:italic}
   .sec-title{font-size:13px;font-weight:700;margin:18px 0 8px;padding-bottom:4px;
     border-bottom:1px solid var(--border)}
   .drawer pre{background:#0d1117;border:1px solid var(--border);border-radius:var(--r2);
@@ -339,18 +406,43 @@ TEMPLATE = """<!doctype html>
   <div class="stats-row" id="stats"></div>
 </div>
 <div class="nav">
-  <div class="tab active" data-tab="dashboard">📈 大盘</div>
+  <div class="tab active" data-tab="dashboard">📈 统计</div>
   <div class="tab" data-tab="shelf">📊 货架视图</div>
   <div class="tab" data-tab="gens">📜 生成记录</div>
-  <div class="search-wrap"><span class="search-icon">🔍</span>
-    <input class="search" id="search" placeholder="搜索零件名称 / 描述 / 类型..."></div>
+  <div class="tab" data-tab="dismantle">📦 拆解任务</div>
+  <div class="nav-actions">
+    <div class="search-wrap"><span class="search-icon">🔍</span>
+      <input class="search" id="search" placeholder="搜索零件名称 / 描述 / 类型..."></div>
+  </div>
 </div>
 <div class="main">
-  <section id="dashboard"></section>
-  <section id="shelf" hidden></section>
+  <section id="shelf"></section>
   <section id="gens" hidden></section>
+  <section id="dismantle" hidden></section>
+  <section id="dashboard" hidden></section>
 </div>
 <div class="overlay" id="detail"><aside class="drawer" id="sheet"></aside></div>
+<div class="overlay" id="nsOverlay"><div class="ns-modal" id="nsModal">
+  <div class="ns-head"><b>💬 生成新 Skill</b><span class="ns-close" id="nsClose">✕ 关闭</span></div>
+  <div class="ns-body" id="nsBody"></div>
+  <div class="ns-progress"><div class="ns-pb-label">当前状态：<span id="nsState">已确认 0/6 个维度</span></div>
+    <div class="ns-bar"><div class="ns-bar-fill" id="nsBar" style="width:0%"></div></div></div>
+  <div class="ns-input"><input id="nsInput" placeholder="描述你的需求，或回复老板的追问…"><button id="nsSend">发送</button></div>
+</div></div>
+<div class="overlay" id="tkOverlay"><div class="ns-modal tk-modal">
+  <div class="ns-head"><b>📦 新拆解任务</b><span class="ns-close" id="tkClose">✕ 关闭</span></div>
+  <div class="tk-body">
+    <p>把待拆解的 Skill 包（<code>.zip</code> / <code>.py</code> / <code>.md</code>）放入仓库后，
+    运行 CLI 即可自动解析并回填零件库：</p>
+    <pre><code>python scripts/dismantle.py &lt;skill包路径&gt; --depth standard</code></pre>
+    <ul class="tk-list">
+      <li>🟢 <b>标准深度</b>：拆出章节级零件（推荐）</li>
+      <li>🟡 <b>浅层深度</b>：仅拆出文件级零件</li>
+      <li>🔴 <b>解析失败</b>：文件格式不兼容时给出提示</li>
+    </ul>
+    <p class="tk-hint">本解剖图仅做可视化展示，真实拆解请使用上方 CLI 命令。</p>
+  </div>
+</div></div>
 <div id="peek"></div>
 <script type="application/json" id="__data">__JSON_PAYLOAD__</script>
 <script>
@@ -378,10 +470,12 @@ TEMPLATE = """<!doctype html>
   }
 
   function renderStats(){
-    try{$('stats').innerHTML=
+    try{
+      const pending=(D.generations||[]).filter(g=>!g.auto_dismantled).length;
+      $('stats').innerHTML=
       '<div class="stat-pill"><b>'+D.stats.parts+'</b><small>零件</small></div>'+
       '<div class="stat-pill"><b>'+D.stats.generations+'</b><small>Skill</small></div>'+
-      '<div class="stat-pill"><b>'+D.stats.categories+'</b><small>大类</small></div>';}
+      '<div class="stat-pill"><b>'+pending+'</b><small>待拆解</small></div>';}
     catch(e){console.error('renderStats:',e);}
   }
 
@@ -481,7 +575,8 @@ TEMPLATE = """<!doctype html>
       const nav=$('shelf');
       let pills='<div class="nav-pill active" data-ci="">▦ 全部</div>';
       D.categories.forEach((c,i)=>{pills+='<div class="nav-pill" data-ci="'+i+'">'+CAT_ICON[i]+' '+esc(c.name)+' <b>'+c.count+'</b></div>';});
-      nav.innerHTML='<div class="shelf-toolbar"><div class="view-toggle">'+
+      nav.innerHTML='<div class="shelf-head"><h2 class="shelf-title">📊 货架视图</h2></div>'+
+        '<div class="shelf-toolbar"><div class="view-toggle">'+
         '<button class="vt-btn active" data-mode="card">🗂 卡片</button>'+
         '<button class="vt-btn" data-mode="list">📋 列表</button>'+
         '</div></div>'+
@@ -637,6 +732,28 @@ TEMPLATE = """<!doctype html>
     }catch(e){console.error('renderGens:',e);}
   }
 
+  /* --- Dismantle tasks (5.4) --- */
+  function renderDismantle(){
+    try{
+      const el=$('dismantle');
+      if(!D.generations.length){el.innerHTML='<div class="empty">📦 暂无拆解任务<br><small style="color:var(--muted)">生成 Skill 后会自动产生拆解回填任务</small></div>';return;}
+      let html='<div class="dsm-head"><h2 class="shelf-title">📦 拆解任务</h2>'+
+        '<button class="shelf-add" id="btnNewTask">➕ 新拆解任务</button></div>';
+      D.generations.forEach(g=>{
+        const done=g.auto_dismantled;
+        const outCount=Object.values(D.parts_by_id).filter(p=>p.source_skill_id===g.id).length;
+        html+='<div class="dsm-card '+(done?'done':'proc')+'">'+
+          '<div class="dsm-ico">'+(done?'🟢':'🟡')+'</div>'+
+          '<div class="dsm-main"><div class="dsm-name">'+esc(g.name)+'</div>'+
+          '<div class="dsm-sub">标准深度 · '+esc(g.created_at||'')+'</div></div>'+
+          '<div class="dsm-status">'+(done?'✅ 已完成':'⏳ 处理中')+'</div>'+
+          '<div class="dsm-out">拆出 <b>'+outCount+'</b> 个</div></div>';
+      });
+      el.innerHTML=html;
+      $('btnNewTask').onclick=openTask;
+    }catch(e){console.error('renderDismantle:',e);}
+  }
+
   /* --- Detail drawer --- */
   function showDetail(id){
     try{
@@ -678,19 +795,66 @@ TEMPLATE = """<!doctype html>
 
   /* --- Tab switching --- */
   $('search').oninput=function(e){peek.classList.remove('show');renderShelf(e.target.value);};
-  document.querySelectorAll('.tab').forEach(function(t){
-    t.onclick=function(){
-      document.querySelectorAll('.tab').forEach(function(x){x.classList.remove('active');});
-      t.classList.add('active');
-      const tab=t.dataset.tab;
-      $('dashboard').hidden=tab!=='dashboard';$('shelf').hidden=tab!=='shelf';$('gens').hidden=tab!=='gens';
-      $('search').style.visibility=(tab==='shelf')?'visible':'hidden';peek.classList.remove('show');
-      if(tab==='dashboard'&&!$('dashboard').innerHTML.trim())renderDashboard();
-    };
-  });
+  function switchTab(tab){
+    document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('active',x.dataset.tab===tab));
+    $('shelf').hidden=tab!=='shelf';
+    $('gens').hidden=tab!=='gens';
+    $('dismantle').hidden=tab!=='dismantle';
+    $('dashboard').hidden=tab!=='dashboard';
+    $('search').style.visibility=(tab==='dashboard')?'hidden':'visible';
+    peek.classList.remove('show');
+    if(tab==='dashboard'&&!$('dashboard').innerHTML.trim())renderDashboard();
+    if(tab==='dismantle'&&!$('dismantle').innerHTML.trim())renderDismantle();
+  }
+  document.querySelectorAll('.tab').forEach(function(t){t.onclick=function(){switchTab(t.dataset.tab);};});
+
+  function openTask(){
+    $('tkOverlay').classList.add('show');
+  }
+  $('tkClose').onclick=function(){$('tkOverlay').classList.remove('show');};
+  $('tkOverlay').onclick=function(e){if(e.target===$('tkOverlay'))$('tkOverlay').classList.remove('show');};
+
+  let nsDim=0;const NS_TOTAL=6;
+  const NS_QUESTIONS=[
+    '1. 这个 Skill 的<b>来源</b>有哪些？比如邮件 / 飞书 / 本地文件？',
+    '2. 汇总后的<b>输出格式</b>是什么？Word / Markdown / 表格？',
+    '3. 需要做<b>格式统一</b>吗？还是只做合并？',
+    '4. <b>触发方式</b>是手动还是定时（如每周五）？',
+    '5. 是否需要<b>异常兜底</b>（来源缺失 / 解析失败）？',
+    '6. 结果要<b>推送到哪里</b>？'
+  ];
+  function nsUpdate(){
+    $('nsState').textContent='已确认 '+nsDim+'/'+NS_TOTAL+' 个维度';
+    $('nsBar').style.width=Math.round(nsDim/NS_TOTAL*100)+'%';
+  }
+  function nsBoss(html){const b=$('nsBody');const d=document.createElement('div');d.className='ns-msg boss';d.innerHTML=html;b.appendChild(d);b.scrollTop=b.scrollHeight;}
+  function nsYou(html){const b=$('nsBody');const d=document.createElement('div');d.className='ns-msg you';d.textContent=html;b.appendChild(d);b.scrollTop=b.scrollHeight;}
+  function openNewSkill(){
+    nsDim=0;$('nsBody').innerHTML='';nsUpdate();
+    nsBoss('💡 想做什么 Skill？先说说你的<b>目标场景</b>和用途。');
+    nsYou('我想做一个帮我把周报汇总起来的工具，每周五要用');
+    nsBoss('明白了，先确认几个细节：<br>'+NS_QUESTIONS.slice(0,3).join('<br>'));
+    nsDim=3;nsUpdate();
+    $('nsInput').value='';$('nsOverlay').classList.add('show');$('nsInput').focus();
+  }
+  $('nsClose').onclick=function(){$('nsOverlay').classList.remove('show');};
+  $('nsOverlay').onclick=function(e){if(e.target===$('nsOverlay'))$('nsOverlay').classList.remove('show');};
+  $('nsSend').onclick=function(){
+    const v=$('nsInput').value.trim();if(!v)return;$('nsInput').value='';
+    nsYou(v);
+    if(nsDim<NS_TOTAL){
+      nsBoss('收到。'+NS_QUESTIONS[nsDim]);
+      nsDim++;nsUpdate();
+      if(nsDim===NS_TOTAL)nsBoss('✅ 维度已全部确认，已为你检索匹配零件，可切换到<b>货架视图</b>查看候选。');
+    }else{
+      nsBoss('需求已锁定，可在<b>货架视图</b>查看推荐零件，或直接点击下方生成。');
+    }
+  };
+  $('nsInput').addEventListener('keydown',function(e){if(e.key==='Enter')$('nsSend').click();});
 
   /* --- Init --- */
   renderStats();renderDashboard();renderShelfNav();renderShelfBody();renderGens();
+  switchTab('dashboard');
 })();
 </script>
 </body>
