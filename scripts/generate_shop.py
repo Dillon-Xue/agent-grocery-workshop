@@ -135,11 +135,22 @@ TEMPLATE = """<!doctype html>
   .search{padding:7px 14px 7px 32px;border-radius:20px;border:1px solid var(--border);
     background:var(--solid);color:var(--text);font-size:13px;width:220px;outline:none}
   .search:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(0,212,255,.12)}
-  .layout{display:flex;align-items:flex-start;gap:0;padding:0 28px 40px}
+  .layout{display:flex;align-items:flex-start;gap:0;padding:0 20px 40px}
   .main{flex:1;min-width:0;padding:18px 24px 10px}
+  /* 左侧边栏（可折叠） */
   .sidebar{width:200px;flex-shrink:0;position:sticky;top:14px;
     background:var(--panel);border:1px solid var(--border);border-radius:var(--r);padding:12px;
-    display:flex;flex-direction:column;gap:4px;max-height:calc(100vh - 40px);overflow-y:auto}
+    display:flex;flex-direction:column;gap:4px;max-height:calc(100vh - 40px);overflow-y:auto;
+    transition:width .25s ease, padding .25s ease;
+    order:-1; /* 排在 main 左侧 */}
+  .sidebar.collapsed{width:52px;padding:8px 4px;overflow-x:hidden}
+  .sidebar.collapsed .nav-sec,.sidebar.collapsed .nav-item span:not(.nav-ico),
+  .sidebar.collapsed .live-badge{display:none}
+  .sb-toggle{position:absolute;top:8px;right:8px;width:24px;height:24px;border-radius:6px;
+    border:1px solid var(--border);background:var(--solid);color:var(--muted);
+    font-size:12px;cursor:pointer;display:grid;place-items:center;z-index:5;transition:.18s}
+  .sb-toggle:hover{color:var(--text);border-color:var(--accent)}
+  .sidebar{position:relative}
   .nav-item{display:flex;align-items:center;gap:10px;padding:10px 14px;border-radius:var(--r2);
     cursor:pointer;font-size:13px;font-weight:600;color:var(--muted);border:1px solid transparent;transition:.18s}
   .nav-item:hover{color:var(--text);background:var(--panel2)}
@@ -171,6 +182,8 @@ TEMPLATE = """<!doctype html>
   .kpi{background:var(--panel);border:1px solid var(--border);border-radius:var(--r);padding:14px 16px}
   .kpi b{display:block;font-size:22px;font-weight:800;color:var(--accent)}
   .kpi small{font-size:10px;color:var(--muted)}
+  .kpi-clickable{transition:.2s}
+  .kpi-clickable:hover{transform:translateY(-2px);box-shadow:0 4px 16px rgba(0,180,255,.15);border-color:var(--accent)}
   .arena{position:relative;height:480px;background:
     radial-gradient(ellipse at 50% 100%,rgba(0,212,255,.08) 0%,transparent 60%),
     radial-gradient(ellipse at 20% 20%,rgba(168,85,247,.05) 0%,transparent 45%),
@@ -179,11 +192,15 @@ TEMPLATE = """<!doctype html>
     border:1px solid var(--border);border-radius:var(--r);margin-bottom:18px;overflow:hidden}
   .arena .wb-avatar{position:absolute;left:50%;bottom:0;transform:translateX(-50%);z-index:10;
     height:92%;width:auto;filter:drop-shadow(0 0 40px rgba(0,212,255,.25)) drop-shadow(0 0 80px rgba(168,85,247,.15))}
-  .capsule{position:absolute;transform:translate(-50%,-50%);border-radius:16px;padding:5px 10px;font-size:10.5px;
-    font-weight:600;cursor:pointer;border:1px solid rgba(255,255,255,.12);background:rgba(5,10,20,.55);
-    backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);white-space:nowrap;
-    box-shadow:0 2px 8px rgba(0,0,0,.25);transition:.2s;z-index:5;opacity:.88}
-  .capsule:hover{transform:translate(-50%,-50%) scale(1.12);z-index:7;opacity:1;box-shadow:0 4px 20px rgba(0,0,0,.35)}
+  .capsule{position:absolute;transform:translate(-50%,-50%);border-radius:16px;padding:4px 10px;font-size:10px;
+    font-weight:600;cursor:pointer;border:1px solid;white-space:nowrap;display:inline-block;
+    box-shadow:0 2px 8px rgba(0,0,0,.15);transition:.25s;z-index:5;
+    color:#e0f4ff;background:rgba(0,20,40,.55);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
+  .cap-name{font-weight:700}
+  .cap-count{font-weight:400;opacity:.6;font-size:9px;margin-left:2px}
+  .capsule:hover{transform:translate(-50%,-50%) scale(1.08);z-index:7;opacity:1;box-shadow:0 4px 20px rgba(0,0,0,.25)}
+  html[data-theme="light"] .capsule, :root:not([data-theme="dark"]) .capsule{color:#1a2332;background:rgba(255,255,255,.75);border-color:rgba(0,0,0,.12);box-shadow:0 2px 8px rgba(0,0,0,.08)}
+  html[data-theme="light"] .capsule:hover, :root:not([data-theme="dark"]) .capsule:hover{box-shadow:0 4px 20px rgba(0,0,0,.15)}
   .arena .arena-hint{position:absolute;bottom:6px;left:0;right:0;text-align:center;font-size:9.5px;color:var(--muted);z-index:15;text-shadow:0 1px 4px rgba(0,0,0,.6)}
 
   .sk-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px}
@@ -198,14 +215,41 @@ TEMPLATE = """<!doctype html>
   .sk-acts{display:flex;gap:6px}
   .sk-acts .btn{flex:1;padding:6px 8px;font-size:11px;text-align:center}
 
+  /* 视图切换 + 列表视图 */
+  .view-bar{display:flex;align-items:center;gap:8px;margin-bottom:14px}
+  .view-toggle{display:flex;border:1px solid var(--border);border-radius:20px;overflow:hidden;background:var(--solid)}
+  .view-toggle .vt-btn{padding:5px 12px;font-size:12px;cursor:pointer;border:none;background:transparent;color:var(--muted);transition:.15s}
+  .view-toggle .vt-btn.active{background:var(--accent);color:#fff}
+  .view-toggle .vt-btn:hover:not(.active){background:var(--panel)}
+  /* 列表视图表格 */
+  .list-table{width:100%;border-collapse:collapse;font-size:13px}
+  .list-table thead th{background:var(--panel);border-bottom:2px solid var(--border);padding:10px 12px;text-align:left;font-weight:700;color:var(--text2);font-size:11px;text-transform:uppercase;letter-spacing:.4px;position:sticky;top:0;z-index:2}
+  .list-table tbody tr{border-bottom:1px solid var(--border);transition:.15s}
+  .list-table tbody tr:hover{background:var(--panel)}
+  .list-table td{padding:10px 12px;vertical-align:middle;color:var(--text)}
+  .list-table td.lt-name{font-weight:600;color:var(--text);max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .list-table td.lt-desc{color:var(--muted);font-size:12px;max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .list-table td.lt-actions{white-space:nowrap}
+  .list-table .lt-tag{font-size:10px;padding:2px 7px;border-radius:9px;background:var(--panel2);color:var(--text2);margin-right:3px}
+  /* 翻页 */
+  .pagination{display:flex;align-items:center;justify-content:center;gap:6px;margin-top:16px;padding:10px 0}
+  .pagination button{padding:5px 12px;border:1px solid var(--border);border-radius:8px;background:var(--solid);color:var(--text);cursor:pointer;font-size:12px;transition:.15s}
+  .pagination button:hover:not(:disabled){border-color:var(--accent);color:var(--accent)}
+  .pagination button:disabled{opacity:.35;cursor:not-allowed}
+  .pagination .page-info{font-size:12px;color:var(--muted);margin:0 8px}
+
   /* 统计（workshop） */
   .dash-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:22px}
+  @media(max-width:1100px){.dash-grid{grid-template-columns:repeat(2,1fr)}}
+  @media(max-width:600px){.dash-grid{grid-template-columns:1fr}}
   .dash-card{background:var(--panel);border:1px solid var(--border);border-radius:var(--r);padding:18px 20px;position:relative;overflow:hidden}
   .dash-card::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--dc,var(--accent))}
   .dc-label{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px}
   .dc-val{font-size:26px;font-weight:800;color:var(--text)}
   .dc-sub{font-size:11px;color:var(--muted);margin-top:4px}
+  .ds-stack{display:flex;flex-direction:column;gap:18px;margin-bottom:18px}
   .ds-row{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-bottom:18px}
+  @media(max-width:900px){.ds-row{grid-template-columns:1fr}}
   .dash-section{background:var(--panel);border:1px solid var(--border);border-radius:var(--r);padding:18px}
   .ds-title{font-size:13px;font-weight:700;margin-bottom:12px;display:flex;align-items:center;gap:6px}
   .bar-row{display:flex;align-items:center;gap:10px;font-size:13px;margin-bottom:14px}
@@ -341,8 +385,27 @@ TEMPLATE = """<!doctype html>
     <input class="search" id="search" placeholder="搜索 skill / 零件 / 对话..."></div>
 </div>
 <div class="layout">
+  <aside class="sidebar" id="sidebar">
+    <button class="sb-toggle" id="sbToggle" title="收起/展开">◀</button>
+    <div class="nav-sec">总览</div>
+    <div class="nav-item active" data-tab="dashboard"><span class="nav-ico">🤖</span> 概览</div>
+    <div class="nav-sec">零件库</div>
+    <div class="nav-item" data-tab="shelf"><span class="nav-ico">📊</span> 货架视图</div>
+    <div class="nav-item" data-tab="gens"><span class="nav-ico">📜</span> 生成记录</div>
+    <div class="nav-item" data-tab="dismantle"><span class="nav-ico">📦</span> 拆解任务</div>
+    <div class="nav-sec">Skill</div>
+    <div class="nav-item" data-tab="skills"><span class="nav-ico">🧩</span> Skill 目录</div>
+    <div class="nav-sec">Agent</div>
+    <div class="nav-item" data-tab="chat"><span class="nav-ico">💬</span> 对话</div>
+    <div class="nav-item" data-tab="tasks"><span class="nav-ico">📋</span> 任务</div>
+    <div class="nav-item" data-tab="anomalies"><span class="nav-ico">🚨</span> 异常日志</div>
+    <div class="nav-sec">系统</div>
+    <div class="nav-item" data-tab="settings"><span class="nav-ico">⚙️</span> 设置</div>
+    <div class="live-badge" id="liveBadge">模式：<b>离线快照</b><br>启动 server.py 启用实时运维</div>
+  </aside>
   <div class="main">
     <section id="dashboard"></section>
+    <section id="skills" hidden></section>
     <section id="stats" hidden></section>
     <section id="shelf" hidden></section>
     <section id="gens" hidden></section>
@@ -352,22 +415,6 @@ TEMPLATE = """<!doctype html>
     <section id="anomalies" hidden></section>
     <section id="settings" hidden></section>
   </div>
-  <aside class="sidebar">
-    <div class="nav-sec">总览</div>
-    <div class="nav-item active" data-tab="dashboard"><span class="nav-ico">🤖</span> 大盘</div>
-    <div class="nav-item" data-tab="stats"><span class="nav-ico">📈</span> 统计</div>
-    <div class="nav-sec">零件库</div>
-    <div class="nav-item" data-tab="shelf"><span class="nav-ico">📊</span> 货架视图</div>
-    <div class="nav-item" data-tab="gens"><span class="nav-ico">📜</span> 生成记录</div>
-    <div class="nav-item" data-tab="dismantle"><span class="nav-ico">📦</span> 拆解任务</div>
-    <div class="nav-sec">Agent</div>
-    <div class="nav-item" data-tab="chat"><span class="nav-ico">💬</span> 对话</div>
-    <div class="nav-item" data-tab="tasks"><span class="nav-ico">📋</span> 任务</div>
-    <div class="nav-item" data-tab="anomalies"><span class="nav-ico">🚨</span> 异常日志</div>
-    <div class="nav-sec">系统</div>
-    <div class="nav-item" data-tab="settings"><span class="nav-ico">⚙️</span> 设置</div>
-    <div class="live-badge" id="liveBadge">模式：<b>离线快照</b><br>启动 server.py 启用实时运维</div>
-  </aside>
 </div>
 <div class="overlay" id="detail"><aside class="drawer" id="sheet"></aside></div>
 <div class="toast" id="toast"></div>
@@ -387,6 +434,51 @@ TEMPLATE = """<!doctype html>
   function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
   function fmtBytes(b){b=Number(b)||0;const u=['B','KB','MB','GB','TB'];let i=0;while(b>=1024&&i<u.length-1){b/=1024;i++;}return b.toFixed(i?1:0)+' '+u[i];}
   function fmtNum(n){n=Number(n)||0;return n>=1e6?(n/1e6).toFixed(2)+'M':n>=1e3?(n/1e3).toFixed(1)+'k':String(n);}
+
+  /* ---------- Skill 中文名映射 ---------- */
+  const CN_SKILL_NAMES={
+    '零件杂货铺 (Grocery Workshop)':'零件杂货铺',
+    'fde-delivery-assistant':'FDE交付助手',
+    'humanizer':'文风人性化',
+    'Interview-Debrief':'面试复盘教练',
+    'local-chat-search':'本地对话搜索',
+    'office-to-visual-html':'Office转可视化HTML',
+    'photo-editing':'图片批处理',
+    'playwright-browser-automation':'浏览器自动化',
+    'PortfolioForge':'个人品牌站铸造师',
+    'skill-audit':'Skill审计清理',
+    'skill-compare':'Skill横向对比',
+    'Skill Favor Metric':'Skill热度追踪',
+    'skill-install-guard':'安装去重守卫',
+    'skill-scanner':'安全扫描器',
+    'skill-search':'Skill搜索查找',
+    'web-access':'联网操作入口',
+    'workbuddy-session-recovery':'会话恢复工具',
+    'github':'GitHub连接器',
+    '3D模型与视频特效':'3D模型与视频特效',
+    'cloudstudio-deploy':'CloudStudio部署',
+    'expert-manager':'专家包管理器',
+    'marketplace-skill-installer':'市场安装器',
+    'neodata-financial-search':'NeoData金融搜索',
+    'skill-creator':'Skill创建向导',
+    'tencent-docs-routing':'腾讯文档路由',
+    'tencent-local-office-edit':'本地Office编辑',
+    'wb-finance-skill':'金融数据总入口',
+    'westock-data':'金融结构化数据',
+    'westock-tool':'选股选基工具',
+    'i-have-adhd':'ADHD专注助手',
+    'local-chat-search':'本地对话搜索',
+    'skill-audit':'Skill审计清理'
+  };
+  function cnName(name){
+    // 精确匹配
+    if(CN_SKILL_NAMES[name])return CN_SKILL_NAMES[name];
+    // 模糊匹配（处理带版本后缀等变体）
+    for(const [en,cn] of Object.entries(CN_SKILL_NAMES)){
+      if(name.includes(en)||en.includes(name))return cn;
+    }
+    return name; // 无匹配则原样返回
+  }
   function toast(msg){const t=$('toast');t.textContent=msg;t.classList.add('show');clearTimeout(t._t);t._t=setTimeout(()=>t.classList.remove('show'),2200);}
   function copy(text){ try{ navigator.clipboard.writeText(text); toast('已复制命令到剪贴板'); }catch(e){ toast(text); } }
 
@@ -433,91 +525,214 @@ TEMPLATE = """<!doctype html>
       '<div class="stat-pill"><b>'+fmtBytes(a.wb_disk_bytes||0)+'</b><small>本地占用</small></div>';
   }
 
-  /* ---------- 大盘 ---------- */
+  /* ---------- 大盘辅助函数 ---------- */
   function wbAvatar(){
     return '<img class="wb-avatar" src="assets/sprite_avatar.png" alt="WorkBuddy Dragon Knight" />';
   }
   function heatColor(hot){
-    // hot 0..1
     if(hot>0.66)return '#ff4081'; if(hot>0.4)return '#ffab00'; if(hot>0.18)return '#00d4ff'; return '#4a6a8a';
   }
+
+  /* ---------- 概览（融合 dashboard + stats） ---------- */
   function renderDashboard(){
     const a=A.agent||{}, skills=A.skills||[];
+    // === Agent KPI ===
     const kpi=
-      kpiCard('Skill 总数', a.skill_count||0,'已安装','rgba(0,212,255,.1)')+
-      kpiCard('Agent Token', fmtNum(a.total_token||0),'真实累计','rgba(168,85,247,.1)')+
-      kpiCard('Skill 估算', fmtNum(a.token_est_total||0),'单次触发体量','rgba(0,230,118,.1)')+
+      kpiCard('Skill 总数', a.skill_count||0,'已安装','rgba(0,212,255,.1)', 'skills')+
+      kpiCard('累计 Token', fmtNum(a.total_token||0),'真实消耗','rgba(168,85,247,.1)')+
+      kpiCard('本地占用', fmtBytes(a.wb_disk_bytes||0),'磁盘空间','rgba(0,230,118,.1)')+
       kpiCard('对话数', a.conversation_count||0,'sessions','rgba(255,171,0,.1)')+
       kpiCard('任务数', a.task_count||0,'automations','rgba(255,64,129,.1)')+
       kpiCard('异常日志', a.anomaly_count||0,'logs','rgba(255,64,129,.08)');
-    const arena='<div class="arena" id="arena">'+wbAvatar()+'<div class="arena-hint">✦ 背景胶囊 = 已安装 Skill（大小/颜色/透明度 ∝ 使用热度）· 点击查看详情</div></div>';
-    const grid=skills.length?('<div class="sk-grid">'+skills.map(skCardHTML).join('')+'</div>'):'<div class="empty">未检测到已安装的 skill</div>';
-    $('dashboard').innerHTML=
-      '<div class="sec-head"><h2>🤖 大盘</h2>'+
-      (LIVE?'<button class="btn bad" id="btnClean">🧹 清理空间</button><button class="btn" id="btnBackup">💾 备份对话</button>':'<span class="tag">离线模式：运维需启动 server.py</span>')+
+    const arena='<div class="arena" id="arena">'+wbAvatar()+'</div>';
+    // === 零件库统计（原 stats 页内容） ===
+    const pbid=W.parts_by_id||{}, all=Object.values(pbid);
+    const totalUsage=all.reduce((s,p)=>s+(p.usage_count||0),0);
+    const tm={};all.forEach(p=>{const t=cardType(p);tm[t]=(tm[t]||0)+1;});
+    const heat=[...all].sort((a,b)=>(b.usage_count||0)-(a.usage_count||0)).slice(0,8);
+    const sm={};all.forEach(p=>{const s=p.source_type||'initial';sm[s]=(sm[s]||0)+1;});
+    const typeNames={prompt:'Prompt片段',python:'代码',process:'流程规范',config:'配置文件',ref:'参考文档',default:'其他'};
+    const tBars=Object.entries(tm).map(([k,v])=>{const pct=Math.round(v/all.length*100);
+      return'<div class="bar-row"><div class="bar-label">'+(typeNames[k]||k)+'</div><div class="bar-track"><div class="bar-fill" style="width:'+pct+'%"></div></div><div class="bar-count">'+pct+'%</div></div>';}).join('');
+    const hList=heat.map((p,i)=>{const rc=i<3?'r'+(i+1):'rx';
+      return'<li class="heat-item"><div class="heat-rank '+rc+'">'+(i+1)+'</div><div class="heat-name" data-id="'+esc(p.id)+'">'+esc(p.name)+'</div><div class="heat-val">🔗 '+(p.usage_count||0)+'</div></li>';}).join('');
+    const sBars=Object.entries(sm).map(([k,v])=>{const pct=Math.round(v/all.length*100);const lbl={initial:'初始零件包',dismantled:'拆解产物',auto_generated:'自动生成'}[k]||k;
+      return'<div class="src-bar"><label>'+lbl+'</label><div class="src-track"><div class="src-fill" style="width:'+pct+'%;background:var(--c0)"></div></div><div class="src-pct">'+pct+'%</div></div>';}).join('');
+    const statsBlock=
+      '<div style="margin-top:20px">'+
+      '<div class="sec-head"><h2>📈 零件库统计</h2></div>'+
+      '<div class="dash-grid">'+
+      kpiCard('总零件数',W.stats.parts,'分布 '+W.stats.categories+' 类','rgba(0,212,255,.1)')+
+      kpiCard('已组装 Skill',W.stats.generations,'累计使用 '+totalUsage+' 次','rgba(168,85,247,.1)')+
+      kpiCard('最热零件',heat[0]?esc(heat[0].name):'—','','rgba(0,230,118,.1)')+
+      kpiCard('来源渠道',Object.keys(sm).length,'种','rgba(255,171,0,.1)')+
       '</div>'+
-      '<div class="kpi-row">'+kpi+'</div>'+arena+grid;
+      '<div class="ds-row"><div class="dash-section"><div class="ds-title">🏷️ 类型构成</div><div class="ds-scroll">'+tBars+'</div></div>'+
+      '<div class="dash-section"><div class="ds-title">🔥 使用热度 TOP 8</div><div class="ds-scroll"><ul class="heat-list">'+hList+'</ul></div></div></div>'+
+      '<div class="dash-section"><div class="ds-title">📦 来源占比</div><div class="ds-scroll">'+sBars+'</div></div>'+
+      '</div>';
+
+    $('dashboard').innerHTML=
+      '<div class="sec-head">'+
+      (LIVE?'<button class="btn bad" id="btnClean">🧹 清理空间</button><button class="btn" id="btnBackup">💾 备份对话</button>':'')+
+      '</div>'+
+      '<div class="kpi-row">'+kpi+'</div>'+arena+statsBlock;
     if(LIVE){ $('btnClean').onclick=actClean; $('btnBackup').onclick=actBackup; }
-    // 放置胶囊：散布背景墙模式（非圆形围绕）
-    const arenaEl=$('arena');
-    if(arenaEl && skills.length){
-      const W=arenaEl.clientWidth, H=arenaEl.clientHeight;
+    // 统计区交互
+    $('dashboard').querySelectorAll('.heat-name').forEach(el=>el.onclick=()=>showDetail(el.dataset.id));
+    // KPI 点击跳转（Skill 总数 → 货架/列表页）
+    $('dashboard').querySelectorAll('.kpi-clickable').forEach(el=>{
+      el.style.cursor='pointer';
+      el.onclick=()=>{ const t=el.dataset.goto; if(t)switchTab(t); };
+    });
+    // 放置胶囊：蛇形网格填充，均匀铺满整个 arena
+    function placeCapsules(){
+      const arenaEl=$('arena');
+      if(!arenaEl || !skills.length)return;
+      const aw=arenaEl.clientWidth||arenaEl.offsetWidth||800;
+      const ah=arenaEl.clientHeight||arenaEl.offsetHeight||480;
+      if(aw<100 || ah<100){ requestAnimationFrame(placeCapsules); return; }
       const maxUse=Math.max(1,...skills.map(s=>s.usage_count||0));
-      // 预计算网格避免重叠：将 arena 划为 8x5 格子，每格最多 1 个
-      const cols=8, rows=5, cellW=W/cols, cellH=H/rows;
-      const usedCells=new Set();
-      // 按热度排序（高的优先选好位置）
-      const indexed=skills.map((s,i)=>({s,i,hot:(s.usage_count||0)/maxUse}))
+      const n=skills.length;
+      // 按热度排序
+      const indexed=skills.map((s,i)=>({s:i,hot:(s.usage_count||0)/maxUse}))
         .sort((a,b)=>b.hot-a.hot);
-      indexed.forEach(({s:i,hot})=>{
-        // 找最优空格（偏好上中区，避开底部人偶区域）
-        let bestCell=-1, bestScore=-Infinity;
-        for(let r=0;r<rows-1;r++){ // 底部一行留给 人偶
-          for(let c=0;c<cols;c++){
-            const key=r*cols+c;
-            if(usedCells.has(key))continue;
-            // 评分：距中心越近越好（高热度），距边缘有变化
-            const cx=c*cellW+cellW/2, cy=r*cellH+cellH/2;
-            const dx=cx-W/2, dy=cy-H/3; // 偏向上方中心
-            const dist=Math.sqrt(dx*dx+dy*dy);
-            const score=(hot*200) - dist + (Math.random()*30);
-            if(score>bestScore){bestScore=score;bestCell=key;}
-          }
+      // 网格：按宽高比算最优列数，让格子接近正方形
+      const aspect=aw/ah;
+      const cols=Math.min(18, Math.max(5, Math.round(Math.sqrt(n*aspect))));
+      const rows=Math.ceil(n/cols);
+      const cellW=aw/cols, cellH=ah/(rows+0.8); // +0.8行底部留给 人偶区域
+      // 蛇形（zigzag）格子队列：偶数行左→右，奇数行右→左
+      const cells=[];
+      for(let row=0;row<rows;row++){
+        const rowCells=[];
+        for(let col=0;col<cols;col++){
+          rowCells.push({cx: col*cellW+cellW/2, cy: row*cellH+cellH/2});
         }
-        if(bestCell<0)return; // 无空格
-        usedCells.add(bestCell);
-        const cr=Math.floor(bestCell/cols), cc=bestCell%cols;
-        const x=cc*cellW+cellW/2 + (Math.random()-.5)*cellW*.5;
-        const y=cr*cellH+cellH/2 + (Math.random()-.5)*cellH*.4;
-        const size=Math.max(56,Math.min(140, 56+hot*84));
+        // 奇数行反转（蛇形）
+        if(row%2===1) rowCells.reverse();
+        cells.push(...rowCells);
+      }
+      // 逐个分配（只取前 n 个）
+      indexed.forEach(({s:i,hot})=>{
+        if(!cells.length)return;
+        const target=cells.shift();
+        const size=Math.max(52, Math.min(120, 48+hot*72));
         const c=document.createElement('div');
-        c.className='capsule';c.style.left=x+'px';c.style.top=y+'px';
-        c.style.minWidth=size+'px';c.style.maxWidth=(cellW-8)+'px';
+        c.className='capsule';
+        // 微小抖动避免过于机械
+        const jx=(Math.random()*2-1)*cellW*0.12;
+        const jy=(Math.random()*2-1)*cellH*0.12;
+        c.style.left=(target.cx+jx)+'px';
+        c.style.top=(target.cy+jy)+'px';
+        c.style.minWidth=(size*0.7)+'px';
         c.style.borderColor=heatColor(hot);
         c.style.color=heatColor(hot);
-        c.style.opacity=.55+hot*.45; // 热度越高越醒目
-        c.innerHTML=esc(skills[i].name)+' <span style="opacity:.65">·'+(skills[i].usage_count||0)+'</span>';
-        c.title=skills[i].name+' | 使用'+(skills[i].usage_count||0)+'次 | '+(skills[i].source||'')+' | v'+(skills[i].version||'?');
+        c.style.opacity=.5+hot*.5;
+        c.innerHTML='<span class="cap-name">'+esc(cnName(skills[i].name))+'</span>'+' <span class="cap-count">·'+(skills[i].usage_count||0)+'</span>';
+        c.title=cnName(skills[i].name)+' | 使用'+(skills[i].usage_count||0)+'次 | '+(skills[i].source||'')+' | v'+(skills[i].version||'?');
         c.onclick=()=>showSkillDetail(skills[i]);
         arenaEl.appendChild(c);
       });
     }
+    requestAnimationFrame(placeCapsules);
     $('dashboard').querySelectorAll('.sk-acts .btn').forEach(b=>{
       b.onclick=function(){const id=b.dataset.id;const sk=skById(id);const act=b.dataset.act;
         if(act==='uninstall')actUninstall(sk); else if(act==='openwb')actOpenWB(sk); else if(act==='chat')openChat(sk); };
     });
   }
-  function kpiCard(l,v,s,clr){return '<div class="kpi" style="background:'+clr+'"><b>'+v+'</b><small>'+l+'</small><div style="font-size:10px;color:var(--muted);margin-top:2px">'+s+'</div></div>';}
+  /* ---------- 视图状态 ---------- */
+  let skillsView='card', skillsPage=1;
+  const PAGE_SIZE=10;
+  function renderSkills(query){
+    const allSkills=A.skills||[];
+    const q=(query||'').trim().toLowerCase();
+    // 搜索时也匹配中文名
+    const filtered = q ? allSkills.filter(s=>{
+      const n=cnName(s.name);
+      return (s.name||'').toLowerCase().includes(q)||(n||'').toLowerCase().includes(q)||(s.description||'').toLowerCase().includes(q);
+    }) : allSkills;
+    const totalPages=Math.max(1, Math.ceil(filtered.length/PAGE_SIZE));
+    if(skillsPage>totalPages)skillsPage=totalPages;
+    const start=(skillsPage-1)*PAGE_SIZE;
+    const pageItems=filtered.slice(start, start+PAGE_SIZE);
+
+    // 视图切换栏
+    const vc=skillsView==='card'?' active':'', vl=skillsView==='list'?' active':'';
+    const viewBar='<div class="view-bar"><div class="view-toggle">'+
+      '<button class="vt-btn'+vc+'" data-vt="card">📱 卡片</button>'+
+      '<button class="vt-btn'+vl+'" data-vt="list">📋 列表</button>'+
+      '</div><span style="font-size:12px;color:var(--muted);margin-left:auto">'+filtered.length+' 个结果</span></div>';
+
+    let body='';
+    if(skillsView==='card'){
+      body = pageItems.length
+        ? '<div class="sk-grid">'+pageItems.map(skCardHTML).join('')+'</div>'
+        : '<div class="empty">没有匹配的 Skill</div>';
+    } else {
+      // 列表视图
+      if(!pageItems.length){body='<div class="empty">没有匹配的 Skill</div>';}
+      else {
+        let rows=pageItems.map(s=>{
+          const srcTag=s.source==='git'?'<span class="lt-tag g">git</span>':'<span class="lt-tag y">local</span>';
+          return '<tr data-id="'+esc(s.id)+'">'+
+            '<td class="lt-name" title="'+esc(cnName(s.name))+'">'+esc(cnName(s.name))+'</td>'+
+            '<td class="lt-desc" title="'+esc(s.description||'')+'">'+esc(s.description||'—')+'</td>'+
+            '<td>'+srcTag+'<span class="lt-tag">v'+(s.version||'?')+'</span></td>'+
+            '<td>'+(s.usage_count||0)+'次</td>'+
+            '<td>'+fmtNum(s.token_estimate||0)+'</td>'+
+            '<td>'+fmtBytes(s.disk_bytes||0)+'</td>'+
+            '<td class="lt-actions">'+
+            '<button class="btn" data-id="'+esc(s.id)+'" data-act="openwb">打开</button> '+
+            '<button class="btn go" data-id="'+esc(s.id)+'" data-act="chat">对话</button> '+
+            '<button class="btn bad" data-id="'+esc(s.id)+'" data-act="uninstall">卸载</button>'+
+            '</td></tr>';
+        }).join('');
+        body='<table class="list-table"><thead><tr><th>Skill 名称</th><th>描述</th><th>来源/版本</th><th>使用次数</th><th>Token</th><th>占用空间</th><th>操作</th></tr></thead><tbody>'+rows+'</tbody></table>';
+      }
+    }
+
+    // 翻页控件
+    let pag='';
+    if(totalPages>1){
+      pag='<div class="pagination">'+
+        '<button '+(skillsPage<=1?'disabled':'')+' data-pg="prev">◀ 上一页</button>'+
+        '<span class="page-info">第 '+skillsPage+' / '+totalPages+' 页</span>'+
+        '<button '+(skillsPage>=totalPages?'disabled':'')+' data-pg="next">下一页 ▶</button>'+
+        '</div>';
+    }
+
+    $('skills').innerHTML =
+      '<div class="sec-head"><h2>🧩 Skill 目录</h2><span class="tag">'+(allSkills.length||0)+' 个已安装</span></div>'+
+      viewBar+body+pag;
+
+    // 视图切换事件
+    $('skills').querySelectorAll('.vt-btn').forEach(b=>b.onclick=function(){
+      skillsView=this.dataset.vt; renderSkills(query);
+    });
+    // 翻页事件
+    $('skills').querySelectorAll('[data-pg]').forEach(b=>b.onclick=function(){
+      if(b.dataset.pg==='prev'&&skillsPage>1)skillsPage--;
+      else if(b.dataset.pg==='next'&&skillsPage<totalPages)skillsPage++;
+      renderSkills(query);
+    });
+    // 按钮事件
+    $('skills').querySelectorAll('.sk-acts .btn, .list-table .btn').forEach(b=>{
+      b.onclick=function(){const id=b.dataset.id;const sk=skById(id);const act=b.dataset.act;
+        if(act==='uninstall')actUninstall(sk); else if(act==='openwb')actOpenWB(sk); else if(act==='chat')openChat(sk); };
+    });
+  }
+  function kpiCard(l,v,s,clr,tab){return '<div class="kpi'+(tab?' kpi-clickable':'')+'" style="background:'+clr+'"'+(tab?' data-goto="'+esc(tab)+'"':'')+'><b>'+v+'</b><small>'+l+'</small><div style="font-size:10px;color:var(--muted);margin-top:2px">'+s+'</div></div>';}
   function skById(id){return (A.skills||[]).find(s=>s.id===id);}
   function skCardHTML(s){
     const srcTag=s.source==='git'?'<span class="tag g">git</span>':'<span class="tag y">local</span>';
     return '<div class="sk-card" data-id="'+esc(s.id)+'">'+
-      '<div class="sk-name">'+esc(s.name)+'</div>'+
+      '<div class="sk-name">'+esc(cnName(s.name))+'</div>'+
       '<div class="sk-desc">'+esc(s.description||'(无描述)')+'</div>'+
       '<div class="sk-meta">'+srcTag+'<span class="tag">v'+(s.version||'?')+'</span>'+
-      '<span class="tag">🔗 '+(s.usage_count||0)+'次</span>'+
-      '<span class="tag">⚡'+fmtNum(s.token_estimate||0)+'</span>'+
-      '<span class="tag">💾'+fmtBytes(s.disk_bytes||0)+'</span></div>'+
+      '<span class="tag">🔥 '+(s.usage_count||0)+'次</span>'+
+      '<span class="tag">⚡ '+fmtNum(s.token_estimate||0)+' token</span>'+
+      '<span class="tag">'+fmtBytes(s.disk_bytes||0)+'</span></div>'+
       '<div class="sk-acts">'+
       '<button class="btn" data-id="'+esc(s.id)+'" data-act="openwb">在WB打开</button>'+
       '<button class="btn go" data-id="'+esc(s.id)+'" data-act="chat">对话</button>'+
@@ -528,13 +743,13 @@ TEMPLATE = """<!doctype html>
     const src=s.source==='git'?'src-git':'src-local';
     $('sheet').innerHTML=
       '<button class="close" id="closeSheet">✕ 关闭</button>'+
-      '<h2>'+esc(s.name)+' <span class="tag">v'+(s.version||'?')+'</span></h2>'+
+      '<h2>'+esc(cnName(s.name))+' <span class="tag">v'+(s.version||'?')+'</span></h2>'+
       '<div class="meta">id: '+esc(s.id)+' · 位置: '+esc(s.location||'user')+'</div>'+
       '<div class="chips"><span class="badge use">🔗 '+(s.usage_count||0)+'次</span>'+
       '<span class="badge '+src+'">'+(s.source||'?')+'</span>'+
       (s.source_url?'<span class="badge src-git">'+esc(s.source_url)+'</span>':'')+'</div>'+
       '<div class="sec-title">功能描述</div><div class="rel">'+esc(s.description||'(无)')+'</div>'+
-      '<div class="sec-title">资源占用</div><div class="rel">⚡ token 估算：'+fmtNum(s.token_estimate||0)+'<br>💾 磁盘：'+fmtBytes(s.disk_bytes||0)+'<br>🕒 最后使用：'+esc(s.last_used||'—')+'</div>'+
+      '<div class="sec-title">资源占用</div><div class="rel">⚡ Token使用量估算：'+fmtNum(s.token_estimate||0)+'<br>💾 本地占用空间：'+fmtBytes(s.disk_bytes||0)+'<br>🕒 最后使用：'+esc(s.last_used||'—')+'</div>'+
       '<div class="sec-title">操作</div><div class="sk-acts">'+
       '<button class="btn" id="dOpenwb">在 WorkBuddy 打开</button>'+
       '<button class="btn go" id="dChat">对话</button>'+
@@ -579,39 +794,91 @@ TEMPLATE = """<!doctype html>
   }
 
   /* ---------- 货架 ---------- */
-  let shelfFilter='', shelfQuery='';
+  let shelfFilter='', shelfQuery='', shelfView='card', shelfPage=1;
   function renderShelfNav(){
     let pills='<div class="nav-pill active" data-ci="">▦ 全部</div>';
     W.categories.forEach((c,i)=>{pills+='<div class="nav-pill" data-ci="'+i+'">'+CAT_ICON[i]+' '+esc(c.name)+' <b>'+c.count+'</b></div>';});
-    $('shelf').innerHTML='<div class="sec-head"><h2>📊 货架视图</h2></div><div class="shelf-nav">'+pills+'</div><div id="shelf-body"></div>';
+    const svc=shelfView==='card'?' active':'', svl=shelfView==='list'?' active':'';
+    const viewBar='<div class="view-bar"><div class="view-toggle">'+
+      '<button class="vt-btn'+svc+'" data-svt="card">📱 卡片</button>'+
+      '<button class="vt-btn'+svl+'" data-svt="list">📋 列表</button>'+
+      '</div></div>';
+    $('shelf').innerHTML='<div class="sec-head"><h2>📊 货架视图</h2></div><div class="shelf-nav">'+pills+'</div>'+viewBar+'<div id="shelf-body"></div>';
     $('shelf').querySelectorAll('.nav-pill').forEach(p=>p.onclick=()=>{
       $('shelf').querySelectorAll('.nav-pill').forEach(x=>x.classList.remove('active'));p.classList.add('active');
-      shelfFilter=p.dataset.ci;renderShelfBody();
+      shelfFilter=p.dataset.ci; shelfPage=1; renderShelfBody();
+    });
+    $('shelf').querySelectorAll('[data-svt]').forEach(b=>b.onclick=function(){
+      shelfView=this.dataset.svt; renderShelfBody();
     });
     renderShelfBody();
   }
-  function renderShelfBody(){
-    const body=$('shelf-body');if(!body)return;
-    let html='';
+  function getFilteredParts(){
+    let all=[];
     W.categories.forEach((cat,ci)=>{
       const fi=shelfFilter!==''?parseInt(shelfFilter):null; if(fi!==null&&ci!==fi)return;
-      let all=[];Object.entries(cat.subs).forEach(([sn,ps])=>ps.forEach(p=>all.push(Object.assign({},p,{'_sub':sn}))));
-      if(!all.length)return;
-      const cards=all.map((p,i)=>'<div class="card" data-id="'+esc(p.id)+'" style="--c:var(--c'+ci+')">'+
-        '<div class="card-name">'+esc(p.name)+'</div>'+
-        '<div class="card-desc">'+esc(p.description||'')+'</div>'+
-        '<div class="card-foot"><span class="use-tag">🔗 '+(p.usage_count||0)+'</span><span class="tag">'+esc(p.source_type||'initial')+'</span></div></div>').join('');
-      html+='<div class="dept" style="--c:var(--c'+ci+')"><div class="dept-head"><h2>'+esc(cat.name)+'</h2><span class="cnt">'+all.length+' 个零件</span></div><div class="dept-body"><div class="shelf-cards">'+cards+'</div></div></div>';
+      Object.entries(cat.subs).forEach(([sn,ps])=>ps.forEach(p=>all.push(Object.assign({},p,{'_sub':sn,'_ci':ci}))));
     });
-    body.innerHTML=html||'<div class="empty">没有匹配的零件</div>';
+    if(shelfQuery){
+      const q=shelfQuery.toLowerCase();
+      all=all.filter(p=>[p.name,p.description,p.category,p.sub_category,p.type,''].join(' ').toLowerCase().includes(q));
+    }
+    return all;
+  }
+  function renderShelfBody(){
+    const body=$('shelf-body');if(!body)return;
+    const all=getFilteredParts();
+    const totalPages=Math.max(1, Math.ceil(all.length/PAGE_SIZE));
+    if(shelfPage>totalPages)shelfPage=totalPages;
+    const start=(shelfPage-1)*PAGE_SIZE;
+    const pageItems=all.slice(start, start+PAGE_SIZE);
+
+    let html='';
+    if(shelfView==='card'){
+      const byCat={};
+      pageItems.forEach(p=>{const k=p._ci||0; if(!byCat[k])byCat[k]=[]; byCat[k].push(p);});
+      Object.entries(byCat).forEach(([ci,items])=>{
+        const cat=W.categories[parseInt(ci)]; if(!cat)return;
+        const cards=items.map(p=>'<div class="card" data-id="'+esc(p.id)+'" style="--c:var(--c'+ci+')">'+
+          '<div class="card-name">'+esc(p.name)+'</div>'+
+          '<div class="card-desc">'+esc(p.description||'')+'</div>'+
+          '<div class="card-foot"><span class="use-tag">🔗 '+(p.usage_count||0)+'</span><span class="tag">'+esc(p.source_type||'initial')+'</span></div></div>').join('');
+        html+='<div class="dept" style="--c:var(--c'+ci+')"><div class="dept-head"><h2>'+esc(cat.name)+'</h2><span class="cnt">'+items.length+' 个零件</span></div><div class="dept-body"><div class="shelf-cards">'+cards+'</div></div></div>';
+      });
+      if(!html)html='<div class="empty">没有匹配的零件</div>';
+    } else {
+      if(!pageItems.length){html='<div class="empty">没有匹配的零件</div>';}
+      else {
+        const rows=pageItems.map(p=>'<tr data-id="'+esc(p.id)+'">'+
+          '<td class="lt-name" title="'+esc(p.name)+'">'+esc(p.name)+'</td>'+
+          '<td class="lt-desc" title="'+esc(p.description||'')+'">'+esc(p.description||'—')+'</td>'+
+          '<td><span class="lt-tag">'+esc(p.category||'')+'</span><span class="lt-tag">'+esc(p.sub_category||'')+'</span></td>'+
+          '<td>'+(p.usage_count||0)+'次</td>'+
+          '<td><span class="lt-tag">'+esc(p.source_type||'initial')+'</span></td>'+
+          '</tr>').join('');
+        html='<table class="list-table"><thead><tr><th>零件名称</th><th>描述</th><th>分类</th><th>使用次数</th><th>来源</th></tr></thead><tbody>'+rows+'</tbody></table>';
+      }
+    }
+
+    let pag='';
+    if(totalPages>1){
+      pag='<div class="pagination">'+
+        '<button '+(shelfPage<=1?'disabled':'')+' data-spg="prev">◀ 上一页</button>'+
+        '<span class="page-info">第 '+shelfPage+' / '+totalPages+' 页（共 '+all.length+' 个）</span>'+
+        '<button '+(shelfPage>=totalPages?'disabled':'')+' data-spg="next">下一页 ▶</button>'+
+        '</div>';
+    }
+
+    body.innerHTML=html+pag;
+    body.querySelectorAll('[data-spg]').forEach(b=>b.onclick=function(){
+      if(b.dataset.spg==='prev'&&shelfPage>1)shelfPage--;
+      else if(b.dataset.spg==='next'&&shelfPage<totalPages)shelfPage++;
+      renderShelfBody();
+    });
     body.querySelectorAll('.card').forEach(c=>c.onclick=()=>showDetail(c.dataset.id));
+    body.querySelectorAll('.list-table tbody tr').forEach(tr=>tr.onclick=function(){showDetail(this.dataset.id);});
   }
-  function renderShelf(query){shelfQuery=query||'';renderShelfBody();
-    if(shelfQuery){const q=shelfQuery.toLowerCase();document.querySelectorAll('#shelf-body .card').forEach(el=>{
-      const p=W.parts_by_id[el.dataset.id];if(!p){el.style.display='none';return;}
-      const text=[p.name,p.description,p.category,p.sub_category,p.type,''].join(' ').toLowerCase();
-      el.style.display=text.includes(q)?'':'none';});}
-  }
+  function renderShelf(query){shelfQuery=query||''; shelfPage=1; renderShelfBody();}
 
   /* ---------- 生成记录 ---------- */
   function renderGens(query){
@@ -661,11 +928,11 @@ TEMPLATE = """<!doctype html>
       const sub=(c.model||'')+' · '+(c.updated_at||c.created_at||'')+' · '+(c.message_count||0)+' 条';
       return '<div class="list-row" data-id="'+esc(c.id)+'"><div style="flex:1"><div class="lr-title">'+esc(title)+'</div><div class="lr-sub">'+esc(sub)+'</div></div><button class="lr-tag" data-open="'+esc(c.id)+'">在WB打开</button></div>';
     }).join(''):'<div class="empty">未检测到对话</div>';
-    const skills=(A.skills||[]).map(s=>'<div class="sp'+(chatSkill&&chatSkill.id===s.id?' active':'')+'" data-id="'+esc(s.id)+'">'+esc(s.name)+'</div>').join('');
+    const skills=(A.skills||[]).map(s=>'<div class="sp'+(chatSkill&&chatSkill.id===s.id?' active':'')+'" data-id="'+esc(s.id)+'">'+esc(cnName(s.name))+'</div>').join('');
     $('chat').innerHTML='<div class="sec-head"><h2>💬 对话</h2>'+
       (LIVE?'<span class="tag g">后端已连接，可直接对话</span>':'<span class="tag y">离线：对话需启动 server.py + 配置 LLM</span>')+'</div>'+
       '<div class="chat-wrap"><div class="conv-list">'+lh+'</div>'+
-      '<div class="chat-box"><div class="chat-bar"><b>与 Skill 对话</b>'+(chatSkill?'<span class="tag g">'+esc(chatSkill.name)+'</span>':'<span class="tag">未选择 skill</span>')+'</div>'+
+      '<div class="chat-box"><div class="chat-bar"><b>与 Skill 对话</b>'+(chatSkill?'<span class="tag g">'+esc(cnName(chatSkill.name))+'</span>':'<span class="tag">未选择 skill</span>')+'</div>'+
       '<div class="skill-pick" id="skillPick">'+skills+'</div>'+
       '<div class="chat-msgs" id="chatMsgs"><div class="msg boss">👋 选择一个 Skill，然后开始对话。'+(LIVE?'':'（当前离线，请在设置页启动后端并配置 LLM key）')+'</div></div>'+
       '<div class="chat-in"><input id="chatInput" placeholder="输入消息…"><button class="btn primary" id="chatSend">发送</button></div></div></div>';
@@ -765,14 +1032,15 @@ TEMPLATE = """<!doctype html>
   /* ---------- Tab 切换 ---------- */
   $('search').oninput=function(e){
     const q=e.target.value; const tab=document.querySelector('.nav-item.active').dataset.tab;
-    if(tab==='shelf')renderShelf(q); else if(tab==='gens')renderGens(q); else if(tab==='dismantle')renderDismantle(q);
+    if(tab==='shelf')renderShelf(q); else if(tab==='skills')renderSkills(q); else if(tab==='gens')renderGens(q); else if(tab==='dismantle')renderDismantle(q);
     else if(tab==='chat'||tab==='tasks'||tab==='anomalies'||tab==='dashboard'||tab==='stats'){ /* 这些页搜索为全局，简单提示 */ }
   };
   function switchTab(tab){
     document.querySelectorAll('.nav-item').forEach(x=>x.classList.toggle('active',x.dataset.tab===tab));
-    ['dashboard','stats','shelf','gens','dismantle','chat','tasks','anomalies','settings'].forEach(id=>{$(''+id).hidden=id!==tab;});
+    ['dashboard','stats','skills','shelf','gens','dismantle','chat','tasks','anomalies','settings'].forEach(id=>{$(''+id).hidden=id!==tab;});
     if(tab==='dashboard')renderDashboard();
     else if(tab==='stats')renderStatsPage();
+    else if(tab==='skills'){if(!$('skills').innerHTML.trim())renderSkills();}
     else if(tab==='shelf'){if(!$('shelf').innerHTML.trim())renderShelfNav();}
     else if(tab==='gens')renderGens('');
     else if(tab==='dismantle')renderDismantle('');
@@ -786,6 +1054,14 @@ TEMPLATE = """<!doctype html>
   /* ---------- init ---------- */
   function init(){
     renderStats();
+    // 侧边栏折叠
+    $('sbToggle').onclick=()=>{
+      const sb=$('sidebar');
+      const btn=$('sbToggle');
+      sb.classList.toggle('collapsed');
+      btn.textContent=sb.classList.contains('collapsed')?'▶':'◀';
+      btn.title=sb.classList.contains('collapsed')?'展开侧边栏':'收起侧边栏';
+    };
     switchTab('dashboard');
   }
   boot();
