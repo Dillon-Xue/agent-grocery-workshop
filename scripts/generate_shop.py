@@ -25,7 +25,7 @@ def build_data(root: str) -> dict:
             "usage_count": counts.get(pid, 0),
             "usages": ws.part_usages(pid),
             "siblings": [
-                {"id": s["id"], "name": s["name"], "category": s["category"], "sub_category": s.get("sub_category")}
+                {"id": s["id"], "name": s["name"], "category": s["category"], "sub_category": s.get("sub_category"), "usage_count": s.get("usage_count", 0)}
                 for s in ws.siblings(p)
             ],
         })
@@ -49,6 +49,7 @@ def build_data(root: str) -> dict:
         })
     return {
         "stats": {"parts": len(enriched), "generations": len(gen_view), "categories": len(categories)},
+        "root": os.path.abspath(root),
         "categories": categories,
         "generations": gen_view,
         "parts_by_id": {p["id"]: p for p in enriched},
@@ -79,6 +80,19 @@ TEMPLATE = """<!doctype html>
       --solid:#fff;--border:rgba(0,0,0,.08);--text:#1a2332;--text2:#556677;--muted:#99aab8;
       --accent:#0891b2;--accent2:#059669;--c0:#0891b2;--c1:#7c3aed;--c2:#059669;--c3:#d97706;--c4:#db2777;--c5:#ea580c;
       --glow:0 0 20px rgba(0,0,0,.04);}
+  }
+  /* 主题切换（设置页控制，优先级高于媒体查询） */
+  html[data-theme="light"]{
+    --bg:#f5f7fa;--bg2:#fff;--panel:rgba(0,0,0,.03);--panel2:rgba(0,0,0,.02);
+    --solid:#fff;--border:rgba(0,0,0,.08);--text:#1a2332;--text2:#556677;--muted:#99aab8;
+    --accent:#0891b2;--accent2:#059669;--c0:#0891b2;--c1:#7c3aed;--c2:#059669;--c3:#d97706;--c4:#db2777;--c5:#ea580c;
+    --glow:0 0 20px rgba(0,0,0,.04);
+  }
+  html[data-theme="dark"]{
+    --bg:#050a14;--bg2:#080e1c;--panel:rgba(0,212,255,.04);--panel2:rgba(0,212,255,.02);
+    --solid:#0c1428;--border:rgba(0,212,255,.12);--text:#e0f4ff;--text2:#8ba4c4;--muted:#4a6a8a;
+    --accent:#00d4ff;--accent2:#00ffa3;--c0:#00d4ff;--c1:#a855f7;--c2:#00e676;--c3:#ffab00;--c4:#ff4081;--c5:#ff6e40;
+    --glow:0 0 30px rgba(0,212,255,.08);
   }
   *{box-sizing:border-box;margin:0;padding:0}
   body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
@@ -389,10 +403,16 @@ TEMPLATE = """<!doctype html>
     background:var(--solid);border:1px solid var(--border);border-radius:var(--r);
     box-shadow:0 8px 30px rgba(0,0,0,.35);padding:12px 16px;max-width:320px}
   #peek.show{opacity:1}
-  .pk-head{font-size:13px;font-weight:700;margin-bottom:4px}
+  .pk-head{font-size:13px;font-weight:700;margin-bottom:6px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  .pk-type{font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;
+    background:color-mix(in srgb,var(--accent) 12%,transparent);color:var(--accent);white-space:nowrap}
   .pk-meta{font-size:10px;color:var(--muted);margin-bottom:6px}
-  .pk-src{font-size:11px;color:var(--accent);margin-bottom:4px}
+  .pk-tags{display:flex;gap:6px;margin-bottom:6px;flex-wrap:wrap}
+  .pk-usage{font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;
+    background:color-mix(in srgb,var(--accent) 10%,transparent);color:var(--accent)}
+  .pk-src{font-size:10px;padding:2px 8px;border-radius:10px;background:var(--panel2);color:var(--text2)}
   .pk-desc{font-size:11px;color:var(--text2);line-height:1.5}
+  .pk-hint{font-size:10px;color:var(--muted);margin-top:8px;padding-top:6px;border-top:1px dashed var(--border)}
   .empty{text-align:center;padding:60px 20px;color:var(--muted);font-size:14px}
   @keyframes fadeUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
   .card{animation:fadeUp .3s ease both}
@@ -410,9 +430,10 @@ TEMPLATE = """<!doctype html>
   <div class="tab" data-tab="shelf">📊 货架视图</div>
   <div class="tab" data-tab="gens">📜 生成记录</div>
   <div class="tab" data-tab="dismantle">📦 拆解任务</div>
+  <div class="tab" data-tab="settings">⚙️ 设置</div>
   <div class="nav-actions">
     <div class="search-wrap"><span class="search-icon">🔍</span>
-      <input class="search" id="search" placeholder="搜索零件名称 / 描述 / 类型..."></div>
+      <input class="search" id="search" placeholder="搜索零件 / 名称 / 描述..."></div>
   </div>
 </div>
 <div class="main">
@@ -420,6 +441,7 @@ TEMPLATE = """<!doctype html>
   <section id="gens" hidden></section>
   <section id="dismantle" hidden></section>
   <section id="dashboard" hidden></section>
+  <section id="settings" hidden></section>
 </div>
 <div class="overlay" id="detail"><aside class="drawer" id="sheet"></aside></div>
 <div class="overlay" id="nsOverlay"><div class="ns-modal" id="nsModal">
@@ -689,12 +711,21 @@ TEMPLATE = """<!doctype html>
   function tcChip(ct){const n={prompt:'💬 Prompt',python:'🐍 代码',process:'📋 流程',config:'⚙️ 配置',ref:'📖 文档',default:'◆ 通用'};return n[ct]||'◆';}
 
   /* --- Generations --- */
-  function renderGens(){
+  function renderGens(query){
     try{
       const el=$('gens');
-      if(!D.generations.length){el.innerHTML='<div class="empty">📚 暂无生成记录<br><small style="color:var(--muted)">组装 Skill 后会自动出现在这里</small></div>';return;}
+      const q=(query||'').toLowerCase();
+      let gens=D.generations;
+      if(q){
+        gens=gens.filter(g=>{
+          const parts=(g.used_part_ids||[]).map(pid=>{const p=D.parts_by_id[pid];return p?p.name:'';}).join(' ');
+          const txt=[g.name,g.initial_query,parts].join(' ').toLowerCase();
+          return txt.includes(q);
+        });
+      }
+      if(!gens.length){el.innerHTML='<div class="empty">🔍 没有匹配「'+(query||'')+'」的生成记录</div>';return;}
       let html='';
-      D.generations.forEach(g=>{
+      gens.forEach(g=>{
         const dotColor=g.auto_dismantled?'var(--good)':'var(--accent)';
         const partsHtml=(g.used_part_ids||[]).map(pid=>{const p=D.parts_by_id[pid];return p?'<a data-id="'+pid+'">'+esc(p.name)+'</a>':esc(pid);}).join(' · ');
         /* --- 选用清单：按大类分组 --- */
@@ -718,7 +749,7 @@ TEMPLATE = """<!doctype html>
           (g.auto_dismantled?'<div class="gen-tl-item"><b>♻️ 自动拆解回填</b><span class="gen-tl-time">拆出候选零件并入库</span></div>':'')+
           '</div>';
 
-        html+='<div class="gen-card"><div class="gen-head"><div class="gen-dot" style="background:'+dotColor+'"></div>'+
+        html+='<div class="gen-card" data-gid="'+esc(g.id)+'"><div class="gen-head"><div class="gen-dot" style="background:'+dotColor+'"></div>'+
           '<h3>'+esc(g.name)+'</h3><div class="gen-meta"><span>'+esc(g.created_at||'')+'</span><span>'+(g.used_part_ids?g.used_part_ids.length:0)+' 个零件</span>'+
           (g.auto_dismantled?'<span style="color:var(--good)">✅ 已回填</span>':'')+'</div></div>'+
           '<div class="gen-body">'+tl+
@@ -733,13 +764,16 @@ TEMPLATE = """<!doctype html>
   }
 
   /* --- Dismantle tasks (5.4) --- */
-  function renderDismantle(){
+  function renderDismantle(query){
     try{
       const el=$('dismantle');
-      if(!D.generations.length){el.innerHTML='<div class="empty">📦 暂无拆解任务<br><small style="color:var(--muted)">生成 Skill 后会自动产生拆解回填任务</small></div>';return;}
+      const q=(query||'').toLowerCase();
+      let gens=D.generations;
+      if(q)gens=gens.filter(g=>(g.name||'').toLowerCase().includes(q));
+      if(!gens.length){el.innerHTML='<div class="empty">🔍 没有匹配「'+(query||'')+'」的拆解任务</div>';return;}
       let html='<div class="dsm-head"><h2 class="shelf-title">📦 拆解任务</h2>'+
         '<button class="shelf-add" id="btnNewTask">➕ 新拆解任务</button></div>';
-      D.generations.forEach(g=>{
+      gens.forEach(g=>{
         const done=g.auto_dismantled;
         const outCount=Object.values(D.parts_by_id).filter(p=>p.source_skill_id===g.id).length;
         html+='<div class="dsm-card '+(done?'done':'proc')+'">'+
@@ -754,29 +788,70 @@ TEMPLATE = """<!doctype html>
     }catch(e){console.error('renderDismantle:',e);}
   }
 
+  /* --- Settings (5.x) --- */
+  function renderSettings(){
+    try{
+      const el=$('settings');
+      const root=D.root||'(未知)';
+      el.innerHTML=
+      '<div class="shelf-head"><h2 class="shelf-title">⚙️ 设置</h2></div>'+
+      '<div class="dash-section" style="max-width:580px">'+
+        '<div class="sec-title">🎨 主题</div>'+
+        '<div style="display:flex;gap:10px">'+
+          '<button class="vt-btn" id="themeDark">🌙 暗色</button>'+
+          '<button class="vt-btn" id="themeLight">☀️ 亮色</button>'+
+        '</div>'+
+        '<div class="sec-title" style="margin-top:18px">📁 零件库路径</div>'+
+        '<div style="font-size:12px;color:var(--text2);word-break:break-all">'+esc(root)+'</div>'+
+        '<div class="sec-title" style="margin-top:18px">🔧 生成参数</div>'+
+        '<div style="font-size:12px;color:var(--text2);line-height:1.9">'+
+          '• 自动拆解回填：<b style="color:var(--good)">开启</b>（组装后自动回填零件库）<br>'+
+          '• 默认视图：<b>卡片</b><br>'+
+          '• 数据来源：生成时刻的本地零件库快照（重新运行 <code>generate_shop.py</code> 刷新）'+
+        '</div>'+
+        '<div class="tk-hint" style="margin-top:16px">本解剖图为只读可视化；修改需编辑源文件后重新生成 shop.html。</div>'+
+      '</div>';
+      $('themeDark').onclick=function(){document.documentElement.setAttribute('data-theme','dark');};
+      $('themeLight').onclick=function(){document.documentElement.setAttribute('data-theme','light');};
+    }catch(e){console.error('renderSettings:',e);}
+  }
+
   /* --- Detail drawer --- */
   function showDetail(id){
     try{
       const p=D.parts_by_id[id];if(!p)return;
       const src=p.source_type||'initial';
       const usages=(p.usages||[]).map(u=>'<li><span class="pclick" data-gid="'+esc(u.generation_id)+'">'+esc(u.name)+'</span><span class="tag">'+esc(u.created_at||'')+'</span></li>').join('')||'<li class="tag">暂无被使用记录</li>';
-      const sibs=(p.siblings||[]).map(s=>'<li><span class="pclick" data-id="'+esc(s.id)+'">'+esc(s.name)+'</span><span class="tag">'+esc(s.category)+' > '+esc(s.sub_category||'')+'</span></li>').join('')||'<li class="tag">无同源伙伴</li>';
+      const sibs=(p.siblings||[]).map(s=>'<li><span class="pclick" data-id="'+esc(s.id)+'">'+esc(s.name)+'</span><span class="tag">'+esc(s.category)+' > '+esc(s.sub_category||'')+' · '+(s.usage_count||0)+'次</span></li>').join('')||'<li class="tag">无同源伙伴</li>';
+      const srcGen=p.source_skill_id?D.generations.find(g=>g.id===p.source_skill_id):null;
+      const srcTrace=srcGen
+        ? '<li><span class="pclick" data-gid="'+esc(srcGen.id)+'">'+esc(srcGen.name)+'</span><span class="tag">'+esc(srcGen.created_at||'')+'</span></li>'
+        : '<li class="tag">'+esc(srcLabel[src]||src)+'（初始零件包）</li>';
       const fmt=['python','json','yaml'].includes(p.content_format)?p.content_format:'text';
       const dep=(p.depends_on||[]).map(d=>{const dp=D.parts_by_id[d];return dp?'<span class="pclick" data-id="'+d+'">'+esc(dp.name)+'</span>':esc(d);}).join('、')||'无';
 
       $('sheet').innerHTML=
         '<button class="close" id="closeSheet">✕ 关闭</button>'+
         '<h2>'+esc(p.name)+' <span class="tag">'+esc(p.version||'v1.0')+'</span></h2>'+
-        '<div class="meta">'+esc(p.category||'')+' > '+esc(p.sub_category||'')+' | 类型：'+esc(p.type||'')+' | 来源：'+esc(srcLabel[src]||
-        src)+(p.source_skill_name?' | 拆解自'+esc(p.source_skill_name):'')+'</div>'+
-        '<div class="chips"><span class="badge use">🔗 '+esc(p.usage_count||0)+'次</span><span class="badge '+srcClass[src]+'">'+esc(srcLabel[src])+'</span></div>'+
+        '<div class="meta">'+esc(p.category||'')+' > '+esc(p.sub_category||'')+' | 类型：'+esc(p.type||'')+'</div>'+
+        '<div class="chips"><span class="badge use">🔗 '+esc(p.usage_count||0)+'次</span><span class="badge '+srcClass[src]+'">'+esc(srcLabel[src])+'</span>'+(p.source_skill_name?'<span class="badge '+srcClass[src]+'">拆解自 '+esc(p.source_skill_name)+'</span>':'')+'</div>'+
         '<div class="sec-title">内容</div><pre><code class="language-'+fmt+'">'+esc(p.content||'')+'</code></pre>'+
         '<div class="sec-title">依赖</div><div class="rel">'+dep+'</div>'+
+        '<div class="sec-title">来源追溯</div><ul class="rel">'+srcTrace+'</ul>'+
         '<div class="sec-title">被以下 Skill 使用</div><ul class="rel">'+usages+'</ul>'+
         '<div class="sec-title">同源伙伴</div><ul class="rel">'+sibs+'</ul>';
       $('sheet').querySelectorAll('.pclick[data-id]').forEach(el=>el.onclick=()=>showDetail(el.dataset.id));
+      $('sheet').querySelectorAll('.pclick[data-gid]').forEach(el=>el.onclick=()=>openGen(el.dataset.gid));
       $('closeSheet').onclick=function(){$('detail').classList.remove('show');}; $('detail').classList.add('show');
     }catch(e){console.error('showDetail:',e);}
+  }
+
+  function openGen(id){
+    try{
+      switchTab('gens');
+      const card=document.querySelector('.gen-card[data-gid="'+esc(id)+'"]');
+      if(card){card.classList.add('open');card.scrollIntoView({block:'center'});}
+    }catch(e){console.error('openGen:',e);}
   }
 
   /* --- Peek tooltip --- */
@@ -784,7 +859,11 @@ TEMPLATE = """<!doctype html>
   document.addEventListener('mouseover',function(e){
     const card=e.target.closest('.card');if(!card||!card.closest('#shelf'))return;
     const p=D.parts_by_id[card.dataset.id];if(!p)return;
-    peek.innerHTML='<div class="pk-head"><b>'+esc(p.name)+'</b></div><div class="pk-meta">'+esc(p.category)+' > '+esc(p.sub_category||'')+' | '+esc(p.type||'')+'</div><div class="pk-src">来源：'+esc(srcLabel[p.source_type]||p.source_type||'')+'</div><div class="pk-desc">'+esc(p.description||'(无描述)')+'</div>';
+    peek.innerHTML='<div class="pk-head"><b>'+esc(p.name)+'</b> <span class="pk-type">'+tcChip(cardType(p))+'</span></div>'+
+      '<div class="pk-meta">'+esc(p.category)+' > '+esc(p.sub_category||'')+'</div>'+
+      '<div class="pk-tags"><span class="pk-usage">🔗 '+(p.usage_count||0)+' 次</span><span class="pk-src">来源：'+esc(srcLabel[p.source_type]||p.source_type||'')+'</span></div>'+
+      '<div class="pk-desc">'+esc(p.description||'(无描述)')+'</div>'+
+      '<div class="pk-hint">点击查看完整详情 →</div>';
     peek.classList.add('show');
     const r=card.getBoundingClientRect(),pw=peek.offsetWidth,ph=peek.offsetHeight;
     let top=r.top-ph-12;if(top<10)top=r.bottom+12;
@@ -794,17 +873,28 @@ TEMPLATE = """<!doctype html>
   document.addEventListener('mouseout',function(e){if(!e.relatedTarget||!e.relatedTarget.closest('.card'))peek.classList.remove('show');});
 
   /* --- Tab switching --- */
-  $('search').oninput=function(e){peek.classList.remove('show');renderShelf(e.target.value);};
+  $('search').oninput=function(e){
+    peek.classList.remove('show');
+    currentQuery=e.target.value;
+    const active=document.querySelector('.tab.active');
+    const tab=active?active.dataset.tab:'shelf';
+    if(tab==='shelf')renderShelf(currentQuery);
+    else if(tab==='gens')renderGens(currentQuery);
+    else if(tab==='dismantle')renderDismantle(currentQuery);
+  };
   function switchTab(tab){
     document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('active',x.dataset.tab===tab));
     $('shelf').hidden=tab!=='shelf';
     $('gens').hidden=tab!=='gens';
     $('dismantle').hidden=tab!=='dismantle';
     $('dashboard').hidden=tab!=='dashboard';
-    $('search').style.visibility=(tab==='dashboard')?'hidden':'visible';
+    $('settings').hidden=tab!=='settings';
+    $('search').style.visibility=(tab==='dashboard'||tab==='settings')?'hidden':'visible';
     peek.classList.remove('show');
     if(tab==='dashboard'&&!$('dashboard').innerHTML.trim())renderDashboard();
-    if(tab==='dismantle'&&!$('dismantle').innerHTML.trim())renderDismantle();
+    if(tab==='gens'){if(!$('gens').innerHTML.trim()||currentQuery)renderGens(currentQuery);}
+    if(tab==='dismantle'){if(!$('dismantle').innerHTML.trim()||currentQuery)renderDismantle(currentQuery);}
+    if(tab==='settings'&&!$('settings').innerHTML.trim())renderSettings();
   }
   document.querySelectorAll('.tab').forEach(function(t){t.onclick=function(){switchTab(t.dataset.tab);};});
 
