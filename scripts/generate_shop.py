@@ -697,12 +697,12 @@ TEMPLATE = """<!doctype html>
       D.generations.forEach(g=>{
         const dotColor=g.auto_dismantled?'var(--good)':'var(--accent)';
         const partsHtml=(g.used_part_ids||[]).map(pid=>{const p=D.parts_by_id[pid];return p?'<a data-id="'+pid+'">'+esc(p.name)+'</a>':esc(pid);}).join(' · ');
-        /* --- 选择依据：按大类分组 --- */
+        /* --- 选用清单：按大类分组 --- */
         const catGroups={};
         (g.used_part_ids||[]).forEach(pid=>{const p=D.parts_by_id[pid];if(!p)return;const c=p.category||'其他';(catGroups[c]=catGroups[c]||[]).push(p);});
         let basisHtml='';
         if(Object.keys(catGroups).length){
-          basisHtml='<div class="gen-basis"><div class="gen-basis-title">🎯 选择依据</div>';
+          basisHtml='<div class="gen-basis"><div class="gen-basis-title">📋 选用清单</div>';
           Object.entries(catGroups).forEach(([cat,ps])=>{
             basisHtml+='<div class="gen-basis-row"><span class="gen-basis-cat">'+esc(cat)+'</span>'+
               ps.map(p=>'<span class="gen-basis-part" data-id="'+esc(p.id)+'">'+esc(p.name)+'</span>').join(' · ')+'</div>';
