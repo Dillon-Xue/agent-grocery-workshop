@@ -87,21 +87,20 @@ TEMPLATE = """<!doctype html>
 <title>零件杂货铺 · Agent 管控台</title>
 <style>
   :root{
-    --bg:#050a14; --bg2:#080e1c;
-    --panel:rgba(0,212,255,.04); --panel2:rgba(0,212,255,.02);
-    --solid:#0c1428; --border:rgba(0,212,255,.12);
-    --text:#e0f4ff; --text2:#8ba4c4; --muted:#4a6a8a;
-    --accent:#00d4ff; --accent2:#00ffa3;
-    --good:#00e676; --warn:#ffab00; --bad:#ff4081;
-    --c0:#00d4ff; --c1:#a855f7; --c2:#00e676; --c3:#ffab00; --c4:#ff4081; --c5:#ff6e40;
+    --bg:#f5f7fa; --bg2:#fff;
+    --panel:rgba(0,0,0,.03); --panel2:rgba(0,0,0,.02);
+    --solid:#fff; --border:rgba(0,0,0,.08);
+    --text:#1a2332; --text2:#556677; --muted:#99aab8;
+    --accent:#0891b2; --accent2:#059669;
+    --c0:#0891b2; --c1:#7c3aed; --c2:#059669; --c3:#d97706; --c4:#db2777; --c5:#ea580c;
     --r:14px; --r2:10px;
-    --glow:0 0 30px rgba(0,212,255,.08);
+    --glow:0 0 20px rgba(0,0,0,.04);
   }
-  @media(prefers-color-scheme:no-preference){
-    :root{--bg:#f5f7fa;--bg2:#fff;--panel:rgba(0,0,0,.03);--panel2:rgba(0,0,0,.02);
-      --solid:#fff;--border:rgba(0,0,0,.08);--text:#1a2332;--text2:#556677;--muted:#99aab8;
-      --accent:#0891b2;--accent2:#059669;--c0:#0891b2;--c1:#7c3aed;--c2:#059669;--c3:#d97706;--c4:#db2777;--c5:#ea580c;
-      --glow:0 0 20px rgba(0,0,0,.04);}
+  @media(prefers-color-scheme:dark){
+    :root{--bg:#050a14;--bg2:#080e1c;--panel:rgba(0,212,255,.04);--panel2:rgba(0,212,255,.02);
+      --solid:#0c1428;--border:rgba(0,212,255,.12);--text:#e0f4ff;--text2:#8ba4c4;--muted:#4a6a8a;
+      --accent:#00d4ff;--accent2:#00ffa3;--c0:#00d4ff;--c1:#a855f7;--c2:#00e676;--c3:#ffab00;--c4:#ff4081;--c5:#ff6e40;
+      --glow:0 0 30px rgba(0,212,255,.08);}
   }
   html[data-theme="light"]{
     --bg:#f5f7fa;--bg2:#fff;--panel:rgba(0,0,0,.03);--panel2:rgba(0,0,0,.02);
@@ -166,18 +165,26 @@ TEMPLATE = """<!doctype html>
   .btn.primary:hover{filter:brightness(1.1)}
 
   /* 大盘 */
-  .kpi-row{display:grid;grid-template-columns:repeat(6,1fr);gap:12px;margin-bottom:18px}
+  .kpi-row{display:grid;grid-template-columns:repeat(6,1fr);gap:10px;margin-bottom:18px}
+  @media(max-width:1100px){.kpi-row{grid-template-columns:repeat(3,1fr)}}
+  @media(max-width:700px){.kpi-row{grid-template-columns:repeat(2,1fr)}}
   .kpi{background:var(--panel);border:1px solid var(--border);border-radius:var(--r);padding:14px 16px}
   .kpi b{display:block;font-size:22px;font-weight:800;color:var(--accent)}
   .kpi small{font-size:10px;color:var(--muted)}
-  .arena{position:relative;height:360px;background:radial-gradient(ellipse at 50% 45%,rgba(0,212,255,.07),transparent 70%);
+  .arena{position:relative;height:480px;background:
+    radial-gradient(ellipse at 50% 100%,rgba(0,212,255,.08) 0%,transparent 60%),
+    radial-gradient(ellipse at 20% 20%,rgba(168,85,247,.05) 0%,transparent 45%),
+    radial-gradient(ellipse at 80% 30%,rgba(0,230,118,.04) 0%,transparent 40%),
+    linear-gradient(180deg,rgba(0,212,255,.02),rgba(168,85,247,.03));
     border:1px solid var(--border);border-radius:var(--r);margin-bottom:18px;overflow:hidden}
-  .arena .wb-avatar{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);z-index:2}
-  .capsule{position:absolute;transform:translate(-50%,-50%);border-radius:20px;padding:6px 12px;font-size:11px;
-    font-weight:700;cursor:pointer;border:1px solid var(--border);background:var(--solid);white-space:nowrap;
-    box-shadow:0 4px 14px rgba(0,0,0,.3);transition:.18s;z-index:3}
-  .capsule:hover{transform:translate(-50%,-50%) scale(1.08);z-index:5}
-  .arena .arena-hint{position:absolute;bottom:8px;left:0;right:0;text-align:center;font-size:10px;color:var(--muted)}
+  .arena .wb-avatar{position:absolute;left:50%;bottom:0;transform:translateX(-50%);z-index:10;
+    height:92%;width:auto;filter:drop-shadow(0 0 40px rgba(0,212,255,.25)) drop-shadow(0 0 80px rgba(168,85,247,.15))}
+  .capsule{position:absolute;transform:translate(-50%,-50%);border-radius:16px;padding:5px 10px;font-size:10.5px;
+    font-weight:600;cursor:pointer;border:1px solid rgba(255,255,255,.12);background:rgba(5,10,20,.55);
+    backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);white-space:nowrap;
+    box-shadow:0 2px 8px rgba(0,0,0,.25);transition:.2s;z-index:5;opacity:.88}
+  .capsule:hover{transform:translate(-50%,-50%) scale(1.12);z-index:7;opacity:1;box-shadow:0 4px 20px rgba(0,0,0,.35)}
+  .arena .arena-hint{position:absolute;bottom:6px;left:0;right:0;text-align:center;font-size:9.5px;color:var(--muted);z-index:15;text-shadow:0 1px 4px rgba(0,0,0,.6)}
 
   .sk-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px}
   .sk-card{border:1px solid var(--border);border-radius:var(--r);background:var(--panel);padding:14px;transition:.18s}
@@ -428,19 +435,7 @@ TEMPLATE = """<!doctype html>
 
   /* ---------- 大盘 ---------- */
   function wbAvatar(){
-    return '<svg class="wb-avatar" width="170" height="200" viewBox="0 0 170 200">'+
-      '<defs><linearGradient id="ag" x1="0" y1="0" x2="1" y2="1">'+
-      '<stop offset="0" stop-color="#00d4ff"/><stop offset="1" stop-color="#a855f7"/></linearGradient></defs>'+
-      '<line x1="85" y1="20" x2="85" y2="6" stroke="url(#ag)" stroke-width="3"/>'+
-      '<circle cx="85" cy="4" r="4" fill="#00ffa3"/>'+
-      '<rect x="40" y="28" width="90" height="70" rx="18" fill="#0c1428" stroke="url(#ag)" stroke-width="2.5"/>'+
-      '<circle cx="66" cy="58" r="9" fill="#00d4ff"/><circle cx="104" cy="58" r="9" fill="#a855f7"/>'+
-      '<rect x="64" y="76" width="42" height="6" rx="3" fill="#00ffa3"/>'+
-      '<rect x="48" y="100" width="74" height="80" rx="16" fill="#0c1428" stroke="url(#ag)" stroke-width="2.5"/>'+
-      '<rect x="62" y="118" width="46" height="8" rx="4" fill="#00d4ff" opacity=".8"/>'+
-      '<rect x="62" y="134" width="46" height="8" rx="4" fill="#a855f7" opacity=".8"/>'+
-      '<rect x="62" y="150" width="32" height="8" rx="4" fill="#00ffa3" opacity=".8"/>'+
-      '</svg>';
+    return '<img class="wb-avatar" src="assets/sprite_avatar.png" alt="WorkBuddy Dragon Knight" />';
   }
   function heatColor(hot){
     // hot 0..1
@@ -455,7 +450,7 @@ TEMPLATE = """<!doctype html>
       kpiCard('对话数', a.conversation_count||0,'sessions','rgba(255,171,0,.1)')+
       kpiCard('任务数', a.task_count||0,'automations','rgba(255,64,129,.1)')+
       kpiCard('异常日志', a.anomaly_count||0,'logs','rgba(255,64,129,.08)');
-    const arena='<div class="arena" id="arena">'+wbAvatar()+'<div class="arena-hint">WorkBuddy 人偶 · 背部胶囊=已安装 Skill（大小/颜色∝使用热度）</div></div>';
+    const arena='<div class="arena" id="arena">'+wbAvatar()+'<div class="arena-hint">✦ 背景胶囊 = 已安装 Skill（大小/颜色/透明度 ∝ 使用热度）· 点击查看详情</div></div>';
     const grid=skills.length?('<div class="sk-grid">'+skills.map(skCardHTML).join('')+'</div>'):'<div class="empty">未检测到已安装的 skill</div>';
     $('dashboard').innerHTML=
       '<div class="sec-head"><h2>🤖 大盘</h2>'+
@@ -463,25 +458,47 @@ TEMPLATE = """<!doctype html>
       '</div>'+
       '<div class="kpi-row">'+kpi+'</div>'+arena+grid;
     if(LIVE){ $('btnClean').onclick=actClean; $('btnBackup').onclick=actBackup; }
-    // 放置胶囊
+    // 放置胶囊：散布背景墙模式（非圆形围绕）
     const arenaEl=$('arena');
     if(arenaEl && skills.length){
-      const n=skills.length;
+      const W=arenaEl.clientWidth, H=arenaEl.clientHeight;
       const maxUse=Math.max(1,...skills.map(s=>s.usage_count||0));
-      skills.forEach((s,i)=>{
-        const ang=(Math.PI*2*i/n)-(Math.PI/2);
-        const R=Math.min(arenaEl.clientWidth,arenaEl.clientHeight)/2-46;
-        const cx=arenaEl.clientWidth/2, cy=arenaEl.clientHeight/2;
-        const x=cx+Math.cos(ang)*R, y=cy+Math.sin(ang)*R;
-        const hot=(s.usage_count||0)/maxUse;
-        const size=Math.max(64,Math.min(150, 64+hot*86));
+      // 预计算网格避免重叠：将 arena 划为 8x5 格子，每格最多 1 个
+      const cols=8, rows=5, cellW=W/cols, cellH=H/rows;
+      const usedCells=new Set();
+      // 按热度排序（高的优先选好位置）
+      const indexed=skills.map((s,i)=>({s,i,hot:(s.usage_count||0)/maxUse}))
+        .sort((a,b)=>b.hot-a.hot);
+      indexed.forEach(({s:i,hot})=>{
+        // 找最优空格（偏好上中区，避开底部人偶区域）
+        let bestCell=-1, bestScore=-Infinity;
+        for(let r=0;r<rows-1;r++){ // 底部一行留给 人偶
+          for(let c=0;c<cols;c++){
+            const key=r*cols+c;
+            if(usedCells.has(key))continue;
+            // 评分：距中心越近越好（高热度），距边缘有变化
+            const cx=c*cellW+cellW/2, cy=r*cellH+cellH/2;
+            const dx=cx-W/2, dy=cy-H/3; // 偏向上方中心
+            const dist=Math.sqrt(dx*dx+dy*dy);
+            const score=(hot*200) - dist + (Math.random()*30);
+            if(score>bestScore){bestScore=score;bestCell=key;}
+          }
+        }
+        if(bestCell<0)return; // 无空格
+        usedCells.add(bestCell);
+        const cr=Math.floor(bestCell/cols), cc=bestCell%cols;
+        const x=cc*cellW+cellW/2 + (Math.random()-.5)*cellW*.5;
+        const y=cr*cellH+cellH/2 + (Math.random()-.5)*cellH*.4;
+        const size=Math.max(56,Math.min(140, 56+hot*84));
         const c=document.createElement('div');
         c.className='capsule';c.style.left=x+'px';c.style.top=y+'px';
-        c.style.minWidth=size+'px';c.style.borderColor=heatColor(hot);
+        c.style.minWidth=size+'px';c.style.maxWidth=(cellW-8)+'px';
+        c.style.borderColor=heatColor(hot);
         c.style.color=heatColor(hot);
-        c.innerHTML=esc(s.name)+' <span style="opacity:.7">·'+(s.usage_count||0)+'</span>';
-        c.title=s.name+' | 使用'+(s.usage_count||0)+'次 | '+(s.source||'')+' | v'+(s.version||'?');
-        c.onclick=()=>showSkillDetail(s);
+        c.style.opacity=.55+hot*.45; // 热度越高越醒目
+        c.innerHTML=esc(skills[i].name)+' <span style="opacity:.65">·'+(skills[i].usage_count||0)+'</span>';
+        c.title=skills[i].name+' | 使用'+(skills[i].usage_count||0)+'次 | '+(skills[i].source||'')+' | v'+(skills[i].version||'?');
+        c.onclick=()=>showSkillDetail(skills[i]);
         arenaEl.appendChild(c);
       });
     }
