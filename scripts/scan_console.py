@@ -475,12 +475,15 @@ def scan_workshop():
                   for k, v in cat_map.items()]
 
     # ── 生成 / 拆解记录 ──
+    # 与 workshop.load_generations 对齐：优先读 generations/<id>/manifest.json（嵌套，
+    # 由 record_generation 落盘），同时兼容早期扁平 generations/*.json 旧格式。
     generations = []
     if os.path.isdir(gen_dir):
-        for fn in sorted(os.listdir(gen_dir)):
-            if not fn.endswith('.json'):
+        for name in sorted(os.listdir(gen_dir)):
+            mpath = os.path.join(gen_dir, name, "manifest.json")
+            fp = mpath if os.path.isfile(mpath) else (os.path.join(gen_dir, name) if name.endswith(".json") else None)
+            if not fp:
                 continue
-            fp = os.path.join(gen_dir, fn)
             try:
                 g = json.load(open(fp, 'r', encoding='utf-8'))
                 if isinstance(g, dict):
