@@ -26,7 +26,11 @@ from pathlib import Path
 
 
 def detect_wb_root():
-    """WSL 环境下指向 Windows 用户目录；否则用本机 ~/.workbuddy。"""
+    """WSL 环境下指向 Windows 用户目录；否则用本机 ~/.workbuddy。
+    可用环境变量 WORKBUDDY_ROOT 覆盖（测试隔离用）。"""
+    env = os.environ.get("WORKBUDDY_ROOT")
+    if env:
+        return env
     wsl_win = "/mnt/c/Users/dillon/.workbuddy"
     if os.path.isdir(wsl_win):
         return wsl_win
