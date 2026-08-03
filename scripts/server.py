@@ -1,336 +1,810 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-"""server.py - 零件杂货铺 agent 管控台 本地后端 daemon（仅标准库）。
-
-职责：
-  1) 提供静态管控台页面（从 skill 目录读取 shop.html 返回；未生成则现场生成）
-  2) GET  /api/data              实时聚合 agent 真实数据（build_data）
-  3) POST /api/skill/uninstall   卸载 skill（安全移入 _trash，可恢复）
-  4) POST /api/space/scan        扫描可清理的本地空间
-  5) POST /api/space/clean       执行清理（_trash + 过期日志）
-  6) POST /api/backup            备份对话与 skill 配置为 zip
-  7) POST /api/conversation/compress  压缩某对话（先备份原文件）
-  8) POST /api/chat              代理 LLM 对话（用 skill 的 SKILL.md 作系统上下文）
-  9) GET  /api/open-in-wb        返回 workbuddy:// 深链接（实验性）
-
-配置：skill 目录下 config.json（不提交）
-  { "wb_root": "...", "git": {"owner":"Dillon-Xue","repo":"agent-grocery-workshop"},
-    "llm": {"base_url":"https://api.openai.com/v1","api_key":"","model":"gpt-4o"} }
+"""WorkBuddy 控制台后端服务
+提供静态文件、对话检索、安全清理、Skill 对话等 API。
 """
-import os
-import sys
 import json
-import io
+import os
+import re
 import shutil
-import datetime
-import urllib.request
+import subprocess
+import sys
 import urllib.error
-from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+import urllib.request
+from datetime import datetime
+from http.server import BaseHTTPRequestHandler, HTTPServer
+from pathlib import Path
+from urllib.parse import parse_qs, urlparse
 
-HERE = os.path.dirname(os.path.abspath(__file__))
-if HERE not in sys.path:
-    sys.path.insert(0, HERE)
-import build_data  # noqa
+# ── 配置 ──
+WORKBUDDY_ROOT = Path.home() / ".workbuddy"
+SKILLS_DIR = WORKBUDDY_ROOT / "skills"
+BASE_DIR = Path(__file__).resolve().parent
+CONFIG_FILE = BASE_DIR / "console_config.json"
+BACKUP_DIR = WORKBUDDY_ROOT / "console-backups"
 
-CONFIG_PATH = os.path.join(HERE, "config.json")
-DEFAULT_PORT = 18790
+# WorkBuddy 主程序路径（用于「在 WorkBuddy 打开」）
+WORKBUDDY_EXE_CANDIDATES = [
+    Path("D:/WorkBuddy/WorkBuddy.exe"),
+    Path.home() / "AppData" / "Local" / "WorkBuddy" / "WorkBuddy.exe",
+    Path("C:/Program Files/WorkBuddy/WorkBuddy.exe"),
+]
+
+
+def find_workbuddy_exe():
+    for p in WORKBUDDY_EXE_CANDIDATES:
+        if p.exists():
+            return p
+    return None
+
+# 可清理分类白名单（按 risk 分级）
+CLEANABLE_CATEGORIES = {
+    "logs": {"risk": "safe", "path": WORKBUDDY_ROOT / "logs"},
+    "traces": {"risk": "safe", "path": WORKBUDDY_ROOT / "traces"},
+    "shell": {"risk": "safe", "path": WORKBUDDY_ROOT / "shell-snapshots"},
+    "file_history": {"risk": "safe", "path": WORKBUDDY_ROOT / "file-history"},
+    "clipboard": {"risk": "safe", "path": WORKBUDDY_ROOT / "clipboard-images"},
+    "audit": {"risk": "safe", "path": WORKBUDDY_ROOT / "audit-log"},
+    "connectors": {"risk": "safe", "path": WORKBUDDY_ROOT / "connectors-market"},
+    "conversations": {"risk": "cautious", "path": WORKBUDDY_ROOT / "projects"},
+    "blobs": {"risk": "cautious", "path": WORKBUDDY_ROOT / "blobs"},
+    "app_cache": {"risk": "cautious", "path": WORKBUDDY_ROOT / "app"},
+}
 
 
 def load_config():
-    if os.path.exists(CONFIG_PATH):
+    if CONFIG_FILE.exists():
         try:
-            return json.load(open(CONFIG_PATH, encoding="utf-8"))
+            return json.loads(CONFIG_FILE.read_text(encoding="utf-8"))
         except Exception:
             pass
-    return {}
+    return {
+        "llm": {"base_url": "", "api_key": "", "model": "gpt-4o"},
+        "skillhub": {"base_url": "https://api.skillhub.cn", "api_key": ""},
+    }
 
 
 def save_config(cfg):
-    with open(CONFIG_PATH, "w", encoding="utf-8") as f:
-        json.dump(cfg, f, ensure_ascii=False, indent=2)
+    CONFIG_FILE.write_text(json.dumps(cfg, ensure_ascii=False, indent=2), encoding="utf-8")
 
 
-def wb_root(cfg):
-    return cfg.get("wb_root") or build_data.detect_wb_root()
+CONFIG = load_config()
 
 
-def trash_dir(wb):
-    d = os.path.join(wb, "_trash")
-    os.makedirs(d, exist_ok=True)
-    return d
+class APIHandler(BaseHTTPRequestHandler):
+    def log_message(self, fmt, *args):
+        pass  # 关闭默认日志
 
-
-def backup_dir(wb):
-    d = os.path.join(wb, "_backup")
-    os.makedirs(d, exist_ok=True)
-    return d
-
-
-# ---------- 业务动作 ----------
-
-def uninstall_skill(cfg, skill_id, location):
-    wb = wb_root(cfg)
-    if location == "project":
-        base = os.path.join(os.getcwd(), ".workbuddy", "skills", skill_id)
-    else:
-        base = os.path.join(wb, "skills", skill_id)
-    if not os.path.isdir(base):
-        return {"ok": False, "error": "skill 目录不存在: " + base}
-    ts = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
-    dest = os.path.join(trash_dir(wb), skill_id + "_" + ts)
-    shutil.move(base, dest)
-    return {"ok": True, "moved_to": dest}
-
-
-def scan_space(cfg):
-    wb = wb_root(cfg)
-    items = []
-    # 1. _trash
-    td = trash_dir(wb)
-    t_size = sum(os.path.getsize(os.path.join(td, f)) for f in os.listdir(td)
-                 if os.path.isfile(os.path.join(td, f))) if os.path.isdir(td) else 0
-    t_dirs = len([f for f in os.listdir(td) if os.path.isdir(os.path.join(td, f))]) if os.path.isdir(td) else 0
-    if t_size or t_dirs:
-        items.append({"key": "trash", "label": "已卸载 skill 回收站 (_trash)",
-                      "dirs": t_dirs, "bytes": t_size})
-    # 2. 过期日志（>14 天）
-    logs = os.path.join(wb, "logs")
-    old = 0
-    old_bytes = 0
-    if os.path.isdir(logs):
-        cutoff = datetime.datetime.now().timestamp() - 14 * 86400
-        for f in os.listdir(logs):
-            fp = os.path.join(logs, f)
-            try:
-                if os.path.isfile(fp) and os.path.getmtime(fp) < cutoff:
-                    old += 1
-                    old_bytes += os.path.getsize(fp)
-            except OSError:
-                pass
-    if old:
-        items.append({"key": "old_logs", "label": "超过 14 天的日志 (logs/)",
-                      "files": old, "bytes": old_bytes})
-    return {"ok": True, "items": items, "total_bytes": sum(i["bytes"] for i in items)}
-
-
-def clean_space(cfg, keys):
-    wb = wb_root(cfg)
-    done = []
-    if "trash" in keys:
-        td = trash_dir(wb)
-        if os.path.isdir(td):
-            shutil.rmtree(td, ignore_errors=True)
-            os.makedirs(td, exist_ok=True)
-            done.append("trash")
-    if "old_logs" in keys:
-        logs = os.path.join(wb, "logs")
-        cutoff = datetime.datetime.now().timestamp() - 14 * 86400
-        cnt = 0
-        if os.path.isdir(logs):
-            for f in os.listdir(logs):
-                fp = os.path.join(logs, f)
-                try:
-                    if os.path.isfile(fp) and os.path.getmtime(fp) < cutoff:
-                        os.remove(fp)
-                        cnt += 1
-                except OSError:
-                    pass
-        done.append("old_logs:" + str(cnt))
-    return {"ok": True, "done": done}
-
-
-def backup(cfg):
-    wb = wb_root(cfg)
-    ts = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
-    out = os.path.join(backup_dir(wb), "agent_backup_" + ts + ".zip")
-    import zipfile
-    with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as z:
-        # 对话
-        sess = os.path.join(wb, "sessions")
-        if os.path.isdir(sess):
-            for f in os.listdir(sess):
-                if f.endswith(".json"):
-                    z.write(os.path.join(sess, f), "sessions/" + f)
-        # skill 元数据（仅 SKILL.md + frontmatter，避免打包大二进制）
-        sk = os.path.join(wb, "skills")
-        if os.path.isdir(sk):
-            for name in os.listdir(sk):
-                md = os.path.join(sk, name, "SKILL.md")
-                if os.path.isfile(md):
-                    z.write(md, "skills/" + name + "/SKILL.md")
-    return {"ok": True, "path": out, "bytes": os.path.getsize(out)}
-
-
-def compress_conversation(cfg, conv_id):
-    wb = wb_root(cfg)
-    fp = os.path.join(wb, "sessions", conv_id + ".json")
-    if not os.path.isfile(fp):
-        return {"ok": False, "error": "对话不存在"}
-    data = json.load(open(fp, encoding="utf-8"))
-    msgs = data.get("messages", data.get("conversations", []))
-    if not msgs:
-        return {"ok": False, "error": "无消息可压缩"}
-    # 备份原文件
-    ts = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
-    bk = os.path.join(backup_dir(wb), "session_" + conv_id + "_" + ts + ".json")
-    shutil.copy(fp, bk)
-    # 简单摘要：首尾各保留 2 条 + 统计角色分布
-    keep = (msgs[:2] + msgs[-2:]) if len(msgs) > 4 else msgs
-    roles = {}
-    for m in msgs:
-        r = m.get("role", "?")
-        roles[r] = roles.get(r, 0) + 1
-    summary = {
-        "compressed": True,
-        "original_count": len(msgs),
-        "compressed_at": ts,
-        "role_distribution": roles,
-        "messages": keep,
-    }
-    data["messages"] = [{"role": "system", "content": "（对话已压缩，仅保留首尾摘要）"}]
-    data["messages"].append({"role": "assistant", "content": json.dumps(summary, ensure_ascii=False)})
-    with open(fp, "w", encoding="utf-8") as f:
-        json.dump(data, f, ensure_ascii=False)
-    return {"ok": True, "backup": bk, "original": len(msgs), "kept": len(keep)}
-
-
-def chat_proxy(cfg, skill_id, message, history):
-    llm = cfg.get("llm", {})
-    key = llm.get("api_key", "")
-    if not key:
-        return {"ok": False, "error": "未配置 LLM api_key，请在设置页填写"}
-    base = llm.get("base_url", "https://api.openai.com/v1").rstrip("/")
-    model = llm.get("model", "gpt-4o")
-    # 系统上下文：skill 的 SKILL.md
-    system = "你是 WorkBuddy 的助手。"
-    wb = wb_root(cfg)
-    md = os.path.join(wb, "skills", skill_id, "SKILL.md") if skill_id else None
-    if md and os.path.isfile(md):
-        system = "你正在以 skill《%s》的身份回答用户。请遵循其说明。\n\n" % skill_id
-        system += open(md, encoding="utf-8", errors="ignore").read()[:6000]
-    messages = [{"role": "system", "content": system}]
-    for h in (history or []):
-        messages.append({"role": h.get("role", "user"), "content": h.get("content", "")})
-    messages.append({"role": "user", "content": message})
-    body = json.dumps({"model": model, "messages": messages, "stream": False}).encode("utf-8")
-    req = urllib.request.Request(base + "/chat/completions",
-                                 data=body, headers={"Authorization": "Bearer " + key,
-                                                     "Content-Type": "application/json"})
-    try:
-        with urllib.request.urlopen(req, timeout=60) as r:
-            resp = json.loads(r.read().decode("utf-8"))
-            return {"ok": True, "reply": resp["choices"][0]["message"]["content"]}
-    except urllib.error.HTTPError as e:
-        return {"ok": False, "error": "LLM HTTP %d: %s" % (e.code, e.read(200).decode("utf-8", "ignore"))}
-    except Exception as e:
-        return {"ok": False, "error": str(e)}
-
-
-def open_in_wb(skill_id, prompt):
-    # workbuddy:// 深链接（实验性：参数格式官方未文档化，最坏仅唤起 WB）
-    q = ""
-    if skill_id:
-        q += "skill=" + urllib.parse.quote(skill_id)
-    if prompt:
-        q += ("&" if q else "") + "prompt=" + urllib.parse.quote(prompt)
-    return "workbuddy://chat?" + q if q else "workbuddy://"
-
-
-import urllib.parse  # noqa  (放末尾避免循环 import 影响上面的引用顺序)
-
-
-# ---------- HTTP 处理 ----------
-
-class Handler(BaseHTTPRequestHandler):
-    def _send(self, code, obj=None, body=None, ctype="application/json; charset=utf-8"):
-        if obj is not None:
-            body = json.dumps(obj, ensure_ascii=False).encode("utf-8")
+    def _json(self, data, code=200):
+        body = json.dumps(data, ensure_ascii=False).encode("utf-8")
         self.send_response(code)
-        self.send_header("Content-Type", ctype)
-        if body is not None:
-            self.send_header("Content-Length", str(len(body)))
+        self.send_header("Content-Type", "application/json; charset=utf-8")
+        self.send_header("Access-Control-Allow-Origin", "*")
+        self.send_header("Content-Length", str(len(body)))
         self.end_headers()
-        if body is not None:
-            self.wfile.write(body)
+        self.wfile.write(body)
+
+    def _error(self, msg, code=400):
+        self._json({"ok": False, "error": msg}, code)
+
+    def _read_body(self):
+        length = int(self.headers.get("Content-Length", 0))
+        return self.rfile.read(length).decode("utf-8")
+
+    def do_OPTIONS(self):
+        self.send_response(204)
+        self.send_header("Access-Control-Allow-Origin", "*")
+        self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+        self.send_header("Access-Control-Allow-Headers", "Content-Type")
+        self.end_headers()
 
     def do_GET(self):
-        if self.path == "/" or self.path == "/index.html":
-            return self._serve_html()
-        if self.path == "/api/data":
-            cfg = load_config()
-            data = build_data.build_agent_data(wb_root(cfg))
-            return self._send(200, data)
-        if self.path.startswith("/api/open-in-wb"):
-            from urllib.parse import urlparse, parse_qs
-            qs = parse_qs(urlparse(self.path).query)
-            url = open_in_wb(qs.get("skill", [""])[0], qs.get("prompt", [""])[0])
-            return self._send(200, {"url": url})
-        return self._send(404, {"error": "not found"})
-
-    def _serve_html(self):
-        html_path = os.path.join(HERE, "shop.html")
-        if not os.path.isfile(html_path):
-            # 现场生成
-            try:
-                import generate_shop
-                generate_shop.render(wb_root(load_config()))
-            except Exception:
-                pass
-        try:
-            html = open(html_path, encoding="utf-8").read()
-        except Exception as e:
-            return self._send(500, {"error": "shop.html 缺失: " + str(e)})
-        # 注入 LIVE 标记（同域即视为由 server 提供）
-        html = html.replace("/*__LIVE_FLAG__*/", "window.LIVE=true;window.API='';")
-        self._send(200, body=html.encode("utf-8"), ctype="text/html; charset=utf-8")
+        parsed = urlparse(self.path)
+        path = parsed.path
+        if path == "/":
+            path = "/console.html"
+        if path == "/api/config":
+            return self._json({"ok": True, "config": {**CONFIG.get("llm", {}), "skillhub": CONFIG.get("skillhub", {})}})
+        if path.startswith("/api/"):
+            return self._error("Unsupported GET endpoint", 404)
+        # 静态文件
+        fp = (BASE_DIR / path.lstrip("/")).resolve()
+        if not str(fp).startswith(str(BASE_DIR)):
+            return self._error("Forbidden", 403)
+        if not fp.exists() or fp.is_dir():
+            return self._error("Not found", 404)
+        content_type = "text/html"
+        if fp.suffix == ".js":
+            content_type = "application/javascript"
+        elif fp.suffix == ".json":
+            content_type = "application/json"
+        elif fp.suffix in (".png", ".jpg", ".jpeg", ".gif", ".svg"):
+            content_type = f"image/{fp.suffix.lstrip('.')}"
+        elif fp.suffix == ".css":
+            content_type = "text/css"
+        data = fp.read_bytes()
+        self.send_response(200)
+        self.send_header("Content-Type", content_type)
+        self.send_header("Content-Length", str(len(data)))
+        self.end_headers()
+        self.wfile.write(data)
 
     def do_POST(self):
-        length = int(self.headers.get("Content-Length", 0))
-        raw = self.rfile.read(length) if length else b"{}"
+        parsed = urlparse(self.path)
+        path = parsed.path
         try:
-            payload = json.loads(raw.decode("utf-8")) if raw else {}
+            payload = json.loads(self._read_body() or "{}")
         except Exception:
-            payload = {}
-        cfg = load_config()
-        p = self.path
-        if p == "/api/config":
-            if payload:
-                cfg.update(payload)
-                save_config(cfg)
-            return self._send(200, {"ok": True, "config": cfg})
-        if p == "/api/skill/uninstall":
-            return self._send(200, uninstall_skill(cfg, payload.get("id", ""), payload.get("location", "user")))
-        if p == "/api/space/scan":
-            return self._send(200, scan_space(cfg))
-        if p == "/api/space/clean":
-            return self._send(200, clean_space(cfg, payload.get("keys", [])))
-        if p == "/api/backup":
-            return self._send(200, backup(cfg))
-        if p == "/api/conversation/compress":
-            return self._send(200, compress_conversation(cfg, payload.get("id", "")))
-        if p == "/api/chat":
-            return self._send(200, chat_proxy(cfg, payload.get("skill_id", ""),
-                                              payload.get("message", ""), payload.get("history", [])))
-        return self._send(404, {"error": "not found"})
+            return self._error("Invalid JSON")
 
-    def log_message(self, *a):
-        pass
+        if path == "/api/search":
+            return self.handle_search(payload)
+        if path == "/api/clean/preview":
+            return self.handle_clean_preview(payload)
+        if path == "/api/clean":
+            return self.handle_clean(payload)
+        if path == "/api/chat":
+            return self.handle_chat(payload)
+        if path == "/api/config":
+            return self.handle_config(payload)
+        if path == "/api/conversations":
+            return self.handle_list_conversations(payload)
+        if path == "/api/conversation/detail":
+            return self.handle_conversation_detail(payload)
+        if path == "/api/session/summarize":
+            return self.handle_summarize(payload)
+        if path == "/api/session/delete":
+            return self.handle_session_delete(payload)
+        if path == "/api/skill/delete":
+            return self.handle_skill_delete(payload)
+        if path == "/api/skill/check-update":
+            return self.handle_skill_check_update(payload)
+        if path == "/api/open-workbuddy":
+            return self.handle_open_workbuddy(payload)
+        return self._error("Unsupported POST endpoint", 404)
+
+    def handle_search(self, payload):
+        query = (payload.get("query") or "").strip()
+        scope = payload.get("scope", "all")
+        max_results = int(payload.get("max_results", 20))
+        if not query:
+            return self._json({"ok": True, "total_results": 0, "results": []})
+        search_py = SKILLS_DIR / "local-chat-search" / "scripts" / "search.py"
+        if not search_py.exists():
+            return self._error("local-chat-search 脚本未找到")
+        cmd = [
+            sys.executable,
+            str(search_py),
+            "--query", query,
+            "--scope", scope,
+            "--max-results", str(max_results),
+            "--sort-by", payload.get("sort_by", "relevance"),
+        ]
+        try:
+            proc = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
+            if proc.returncode != 0:
+                return self._error(proc.stderr or "检索脚本执行失败")
+            data = json.loads(proc.stdout)
+            return self._json({"ok": True, **data})
+        except subprocess.TimeoutExpired:
+            return self._error("检索超时", 504)
+        except Exception as e:
+            return self._error(str(e))
+
+    def handle_clean_preview(self, payload):
+        cat_id = payload.get("category_id")
+        if cat_id not in CLEANABLE_CATEGORIES:
+            return self._error(f"未知或不允许清理的分类: {cat_id}")
+        info = CLEANABLE_CATEGORIES[cat_id]
+        target = info["path"]
+        if not target.exists():
+            return self._json({"ok": True, "risk": info["risk"], "files": [], "total_size": 0, "total_files": 0})
+        files = []
+        total = 0
+        for root, dirs, names in os.walk(target):
+            for n in names:
+                fp = Path(root) / n
+                try:
+                    st = fp.stat()
+                    files.append({"path": str(fp), "size": st.st_size})
+                    total += st.st_size
+                except Exception:
+                    pass
+        files.sort(key=lambda x: x["size"], reverse=True)
+        return self._json({"ok": True, "risk": info["risk"], "files": files[:200], "total_size": total, "total_files": len(files)})
+
+    def handle_clean(self, payload):
+        cat_id = payload.get("category_id")
+        if cat_id not in CLEANABLE_CATEGORIES:
+            return self._error(f"未知或不允许清理的分类: {cat_id}")
+        info = CLEANABLE_CATEGORIES[cat_id]
+        target = info["path"]
+        if not target.exists():
+            return self._json({"ok": True, "deleted": 0, "freed": 0})
+
+        # 安全策略：cautious 分类必须显式确认
+        if info["risk"] == "cautious" and not payload.get("confirmed"):
+            return self._error("该分类为谨慎清理，请先在弹窗中确认", 403)
+
+        # 计算体量用于提示
+        freed = 0
+        try:
+            for root, dirs, names in os.walk(target):
+                for n in names:
+                    try:
+                        freed += (Path(root) / n).stat().st_size
+                    except Exception:
+                        pass
+        except Exception:
+            pass
+
+        # 先备份（原样复制到 backup 目录）
+        backup = BACKUP_DIR / f"{cat_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+        try:
+            BACKUP_DIR.mkdir(parents=True, exist_ok=True)
+            shutil.copytree(target, backup)
+        except Exception as e:
+            return self._error(f"备份失败，取消清理: {e}")
+
+        # 放入系统回收站（可恢复），而非直接删除
+        try:
+            send_to_recycle_bin(target)
+        except Exception as e:
+            return self._error(f"放入回收站失败: {e}（备份已生成于 {backup}）")
+        return self._json({
+            "ok": True, "deleted": 1, "freed": freed, "backup": str(backup),
+            "note": "已放入系统回收站，可从回收站恢复；同时已原样备份。",
+        })
+
+    def handle_chat(self, payload):
+        llm = CONFIG.get("llm", {})
+        base_url = (payload.get("base_url") or llm.get("base_url", "")).rstrip("/")
+        api_key = payload.get("api_key") or llm.get("api_key", "")
+        model = payload.get("model") or llm.get("model", "gpt-4o")
+        if not base_url or not api_key:
+            return self._error("请先配置 LLM Base URL 与 API Key", 403)
+        messages = payload.get("messages", [])
+        if not messages:
+            return self._error("消息为空")
+        skill_id = payload.get("skill_id")
+        system = ""
+        if skill_id:
+            skill_md = SKILLS_DIR / skill_id / "SKILL.md"
+            if skill_md.exists():
+                system = skill_md.read_text(encoding="utf-8")[:4000]
+        try:
+            import urllib.request
+            req_data = json.dumps({"model": model, "messages": ([{"role": "system", "content": system}] if system else []) + messages}).encode("utf-8")
+            req = urllib.request.Request(f"{base_url}/chat/completions", data=req_data, method="POST")
+            req.add_header("Authorization", f"Bearer {api_key}")
+            req.add_header("Content-Type", "application/json")
+            with urllib.request.urlopen(req, timeout=120) as resp:
+                data = json.loads(resp.read().decode("utf-8"))
+                content = data["choices"][0]["message"]["content"]
+                return self._json({"ok": True, "content": content})
+        except Exception as e:
+            return self._error(str(e))
+
+    def handle_config(self, payload):
+        global CONFIG
+        CONFIG["llm"] = payload.get("llm", CONFIG.get("llm", {}))
+        if "skillhub" in payload:
+            CONFIG["skillhub"] = {**CONFIG.get("skillhub", {}), **payload.get("skillhub", {})}
+        save_config(CONFIG)
+        return self._json({"ok": True})
+
+    # ── 会话列举 ──
+    def handle_list_conversations(self, payload):
+        only = payload.get("category")
+        groups = []
+        if not only or only == "conversations":
+            if CONVERSATIONS_DIR.exists():
+                for proj in CONVERSATIONS_DIR.iterdir():
+                    if not proj.is_dir():
+                        continue
+                    sessions = []
+                    for f in proj.glob("*.jsonl"):
+                        try:
+                            st = f.stat()
+                            sessions.append({
+                                "id": f.stem, "title": extract_session_title(f),
+                                "size": st.st_size, "mtime": _fmt_time(st.st_mtime),
+                                "mtime_raw": st.st_mtime,
+                                "rel": f"projects/{proj.name}/{f.name}",
+                            })
+                        except Exception:
+                            pass
+                    if sessions:
+                        sessions.sort(key=lambda x: x["mtime_raw"], reverse=True)
+                        last_mtime = sessions[0]["mtime_raw"]
+                        for s in sessions:
+                            s.pop("mtime_raw", None)
+                        groups.append({"category": "conversations", "project": proj.name,
+                                       "last_mtime": last_mtime, "sessions": sessions})
+        if not only or only == "app_cache":
+            app_dir = WORKBUDDY_ROOT / "app"
+            if app_dir.exists():
+                sess_files = list(app_dir.glob("*.json")) + list(app_dir.glob("*.jsonl"))
+                sessions = []
+                for f in sess_files:
+                    try:
+                        st = f.stat()
+                        sessions.append({
+                            "id": f.stem, "title": extract_session_title(f),
+                            "size": st.st_size, "mtime": _fmt_time(st.st_mtime),
+                            "mtime_raw": st.st_mtime,
+                            "rel": f"app/{f.name}",
+                        })
+                    except Exception:
+                        pass
+                if sessions:
+                    sessions.sort(key=lambda x: x["mtime_raw"], reverse=True)
+                    last_mtime = sessions[0]["mtime_raw"]
+                    for s in sessions:
+                        s.pop("mtime_raw", None)
+                    groups.append({"category": "app_cache", "project": "app（会话缓存）",
+                                   "last_mtime": last_mtime, "sessions": sessions})
+        groups.sort(key=lambda x: x["last_mtime"], reverse=True)
+        for g in groups:
+            g.pop("last_mtime", None)
+        return self._json({"ok": True, "groups": groups})
+
+    def handle_conversation_detail(self, payload):
+        """读取单个 WorkBuddy 会话文件，返回结构化消息列表。"""
+        rel = payload.get("rel") or ""
+        if not rel or ".." in rel:
+            return self._error("非法的会话路径")
+        fp = WORKBUDDY_ROOT / rel
+        if not safe_under(WORKBUDDY_ROOT, fp) or not fp.exists():
+            return self._error(f"会话不存在: {rel}")
+
+        messages = []
+        try:
+            if fp.suffix == ".jsonl":
+                for line in fp.read_text(encoding="utf-8").splitlines():
+                    line = line.strip()
+                    if not line:
+                        continue
+                    try:
+                        obj = json.loads(line)
+                    except Exception:
+                        continue
+                    t = obj.get("type")
+                    if t == "message":
+                        role = obj.get("role") or "unknown"
+                        content = obj.get("content") or ""
+                        text = ""
+                        if isinstance(content, list):
+                            for part in content:
+                                if isinstance(part, dict):
+                                    if part.get("type") in ("input_text", "output_text"):
+                                        text += (part.get("text") or "")
+                                    elif part.get("type") == "text":
+                                        text += (part.get("text") or "")
+                        elif isinstance(content, str):
+                            text = content
+                        text = strip_wrapped(text).strip()
+                        if text:
+                            messages.append({"role": role, "content": text, "time": obj.get("time") or obj.get("timestamp") or ""})
+                    elif t == "reasoning":
+                        rc = obj.get("rawContent") or obj.get("content") or ""
+                        if isinstance(rc, list):
+                            for part in rc:
+                                if isinstance(part, dict) and part.get("type") == "reasoning_text":
+                                    txt = (part.get("text") or "").strip()
+                                    if txt:
+                                        messages.append({"role": "reasoning", "content": txt[:600], "time": ""})
+            else:
+                # 普通 JSON 会话缓存，尝试读取 message 数组
+                try:
+                    data = json.loads(fp.read_text(encoding="utf-8"))
+                except Exception:
+                    data = {}
+                msgs = data if isinstance(data, list) else data.get("messages", [])
+                for m in msgs:
+                    role = m.get("role") or "unknown"
+                    content = m.get("content") or ""
+                    text = content if isinstance(content, str) else json.dumps(content, ensure_ascii=False)
+                    text = strip_wrapped(text).strip()
+                    if text:
+                        messages.append({"role": role, "content": text, "time": m.get("time") or m.get("timestamp") or ""})
+        except Exception as e:
+            return self._json({"ok": False, "error": f"读取会话失败: {e}"})
+
+        return self._json({"ok": True, "rel": rel, "messages": messages})
+
+    # ── 会话总结（AI / 规则回退）──
+    def handle_summarize(self, payload):
+        items = payload.get("sessions") or []
+        if not items:
+            return self._error("未选择任何会话")
+        llm = CONFIG.get("llm", {})
+        summaries = []
+        for it in items:
+            rel = it.get("rel") or ""
+            fp = WORKBUDDY_ROOT / rel
+            if not safe_under(WORKBUDDY_ROOT, fp) or not fp.exists():
+                summaries.append({"rel": rel, "title": it.get("title", ""), "summary": "（文件不存在或越权）", "used_ai": False})
+                continue
+            text = extract_conversation_text(fp)
+            summary, used_ai = summarize_text(text, llm)
+            summaries.append({"rel": rel, "title": it.get("title", ""), "summary": summary, "used_ai": used_ai})
+        return self._json({"ok": True, "summaries": summaries})
+
+    # ── 会话删除：强制备份总结 + 回收站 ──
+    def handle_session_delete(self, payload):
+        items = payload.get("sessions") or []
+        if not items:
+            return self._error("未选择任何会话")
+        targets = []
+        for it in items:
+            rel = it.get("rel") or ""
+            fp = WORKBUDDY_ROOT / rel
+            if not safe_under(WORKBUDDY_ROOT, fp) or not fp.exists():
+                return self._error(f"非法或不存在的路径: {rel}")
+            targets.append((rel, fp))
+        # 备份（强制）：复制原始 + 生成 AI/规则总结
+        ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+        backup = BACKUP_DIR / f"sessions_{ts}"
+        try:
+            BACKUP_DIR.mkdir(parents=True, exist_ok=True)
+            backup.mkdir(parents=True, exist_ok=True)
+        except Exception as e:
+            return self._error(f"创建备份目录失败: {e}")
+        llm = CONFIG.get("llm", {})
+        summary_parts = []
+        for rel, fp in targets:
+            try:
+                dest = backup / rel.replace("/", "_")
+                if fp.is_dir():
+                    shutil.copytree(fp, dest)
+                else:
+                    shutil.copy2(fp, dest)
+                text = extract_conversation_text(fp)
+                s, used_ai = summarize_text(text, llm)
+                summary_parts.append(f"## {rel} （AI总结: {'是' if used_ai else '否'}）\n\n{s}\n")
+            except Exception as e:
+                return self._error(f"备份失败（已取消删除）: {e}")
+        try:
+            (backup / "SUMMARY.md").write_text("\n---\n\n".join(summary_parts), encoding="utf-8")
+        except Exception:
+            pass
+        # 放入回收站（可恢复）
+        deleted = 0
+        errors = []
+        for rel, fp in targets:
+            try:
+                send_to_recycle_bin(fp)
+                deleted += 1
+            except Exception as e:
+                errors.append(f"{rel}: {e}")
+        return self._json({
+            "ok": True, "deleted": deleted, "backup": str(backup), "errors": errors,
+            "note": "已放入系统回收站，可从回收站恢复；同时已在备份目录生成会话总结。",
+        })
+
+    # ── Skill 卸载：备份 + 回收站 ──
+    def handle_skill_delete(self, payload):
+        skill_id = payload.get("skill_id") or ""
+        if not skill_id or ".." in skill_id or skill_id.startswith("/") or skill_id.startswith("\\"):
+            return self._error("非法的 Skill ID")
+        fp = SKILLS_DIR / skill_id
+        if not safe_under(SKILLS_DIR, fp) or not fp.exists():
+            return self._error(f"Skill 不存在: {skill_id}")
+        ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+        backup = BACKUP_DIR / f"skill_{skill_id}_{ts}"
+        try:
+            BACKUP_DIR.mkdir(parents=True, exist_ok=True)
+            shutil.copytree(fp, backup)
+        except Exception as e:
+            return self._error(f"备份失败（已取消删除）: {e}")
+        try:
+            send_to_recycle_bin(fp)
+        except Exception as e:
+            return self._error(f"放入回收站失败: {e}（备份已生成于 {backup}）")
+        return self._json({
+            "ok": True, "backup": str(backup),
+            "note": f"Skill {skill_id} 已放入系统回收站，可从回收站恢复；备份位于 {backup}。",
+        })
+
+    # ── Skill 升级检查：查询 SkillHub 最新版本 ──
+    def handle_skill_check_update(self, payload):
+        skill_id = payload.get("skill_id") or ""
+        if not skill_id or ".." in skill_id or skill_id.startswith("/") or skill_id.startswith("\\"):
+            return self._error("非法的 Skill ID")
+        fp = SKILLS_DIR / skill_id
+        if not safe_under(SKILLS_DIR, fp) or not fp.exists():
+            return self._error(f"Skill 不存在: {skill_id}")
+
+        meta_path = fp / "_skillhub_meta.json"
+        if not meta_path.exists():
+            return self._json({
+                "ok": True,
+                "checkable": False,
+                "reason": "该 Skill 不是从 SkillHub / BuiltinMarket 安装，没有 _skillhub_meta.json，无法在线检查版本。",
+            })
+
+        try:
+            meta = json.loads(meta_path.read_text(encoding="utf-8"))
+        except Exception as e:
+            return self._json({"ok": True, "checkable": False, "reason": f"读取 _skillhub_meta.json 失败: {e}"})
+
+        source = (meta.get("source") or "").lower()
+        if source == "marketplace":
+            return self._json({
+                "ok": True,
+                "checkable": False,
+                "reason": "该 Skill 来自 WorkBuddy 内置市场（BuiltinMarket），暂不支持通过此接口在线检查版本。",
+            })
+        if source != "skillhub":
+            return self._json({
+                "ok": True,
+                "checkable": False,
+                "reason": f"该 Skill 来源为 {meta.get('source') or '未知'}，不支持在线检查版本。",
+            })
+
+        slug = meta.get("slug") or meta.get("name") or skill_id
+        current_version = meta.get("version") or "未知"
+        hub_cfg = CONFIG.get("skillhub", {})
+        base_url = (hub_cfg.get("base_url") or "https://api.skillhub.cn").rstrip("/")
+
+        try:
+            detail = fetch_skillhub_skill(base_url, slug, hub_cfg.get("api_key") or "")
+        except urllib.error.HTTPError as e:
+            return self._json({"ok": False, "error": f"SkillHub 返回 HTTP {e.code}，请检查 SkillHub Base URL 或 slug（{slug}）是否正确。"})
+        except Exception as e:
+            return self._json({"ok": False, "error": f"查询 SkillHub 失败: {e}"})
+
+        latest = detail.get("latestVersion") or {}
+        latest_version = latest.get("version") or ""
+        changelog = latest.get("changelog") or ""
+        skill_info = detail.get("skill") or {}
+        skill_name = skill_info.get("displayName") or meta.get("name") or skill_id
+
+        if not latest_version:
+            return self._json({"ok": False, "error": "SkillHub 未返回最新版本信息。"})
+
+        has_update = compare_version(current_version, latest_version) < 0
+        advice = ""
+        if has_update:
+            advice = f"建议升级至 v{latest_version}。"
+            if changelog:
+                advice += f" 更新说明：{changelog}"
+        else:
+            advice = "当前已是最新版本，无需升级。"
+
+        return self._json({
+            "ok": True,
+            "checkable": True,
+            "skill_id": skill_id,
+            "skill_name": skill_name,
+            "slug": slug,
+            "source": meta.get("source"),
+            "current_version": current_version,
+            "latest_version": latest_version,
+            "has_update": has_update,
+            "changelog": changelog,
+            "advice": advice,
+            "skillhub_url": f"https://skillhub.tencent.com/skills/{slug}",
+        })
+
+    def handle_open_workbuddy(self, payload):
+        """启动 WorkBuddy 主程序；如果传入 skill_id，同时打开该 skill 所在目录。"""
+        skill_id = payload.get("skill_id") or ""
+        if skill_id and (".." in skill_id or skill_id.startswith("/") or skill_id.startswith("\\")):
+            return self._error("非法的 Skill ID")
+
+        exe = find_workbuddy_exe()
+        if not exe:
+            return self._json({"ok": False, "error": "未找到 WorkBuddy 主程序（WorkBuddy.exe）。请确认 WorkBuddy 已安装。"})
+
+        # 在 Windows 上以 detached 方式启动，避免阻塞 HTTP 请求
+        try:
+            flags = subprocess.DETACHED_PROCESS | subprocess.CREATE_NEW_PROCESS_GROUP
+        except AttributeError:
+            flags = 0
+        try:
+            subprocess.Popen([str(exe)], shell=False, creationflags=flags, close_fds=True)
+        except Exception as e:
+            return self._json({"ok": False, "error": f"启动 WorkBuddy 失败: {e}"})
+
+        opened_path = None
+        if skill_id:
+            skill_path = SKILLS_DIR / skill_id
+            if safe_under(SKILLS_DIR, skill_path) and skill_path.exists():
+                try:
+                    subprocess.Popen(["explorer", str(skill_path.resolve())], shell=False)
+                    opened_path = str(skill_path)
+                except Exception:
+                    pass
+
+        return self._json({
+            "ok": True,
+            "message": "已启动 WorkBuddy。",
+            "exe": str(exe),
+            "opened_path": opened_path,
+        })
 
 
-def main():
-    import argparse
-    ap = argparse.ArgumentParser()
-    ap.add_argument("--port", type=int, default=DEFAULT_PORT)
-    ap.add_argument("--host", default="127.0.0.1")
-    a = ap.parse_args()
-    srv = ThreadingHTTPServer((a.host, a.port), Handler)
-    print("零件杂货铺 agent 管控台已启动: http://%s:%d/" % (a.host, a.port))
-    print("按 Ctrl+C 停止。")
+# ── 回收站 / 安全工具（模块级）──
+CONVERSATIONS_DIR = WORKBUDDY_ROOT / "projects"
+
+
+def send_to_recycle_bin(target: Path):
+    """将文件或目录移入 Windows 回收站（非直接删除，可恢复）。"""
+    target = target.resolve()
+    pth = str(target).replace('"', '`"')
+    if target.is_dir():
+        ps = ('Add-Type -AssemblyName Microsoft.VisualBasic;'
+              '[Microsoft.VisualBasic.FileIO.FileSystem]::DeleteDirectory('
+              '"{pth}",[Microsoft.VisualBasic.FileIO.UIOption]::OnlyErrorDialogs,'
+              '[Microsoft.VisualBasic.FileIO.RecycleOption]::SendToRecycleBin)').format(pth=pth)
+    else:
+        ps = ('Add-Type -AssemblyName Microsoft.VisualBasic;'
+              '[Microsoft.VisualBasic.FileIO.FileSystem]::DeleteFile('
+              '"{pth}",[Microsoft.VisualBasic.FileIO.UIOption]::OnlyErrorDialogs,'
+              '[Microsoft.VisualBasic.FileIO.RecycleOption]::SendToRecycleBin)').format(pth=pth)
+    subprocess.run(["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", ps],
+                   check=True, capture_output=True, text=True)
+
+
+def safe_under(base, target):
+    """确保 target 严格位于 base 之内（防路径穿越，大小写不敏感）。"""
+    base = os.path.normcase(str(base.resolve()))
+    target = os.path.normcase(str(target.resolve()))
+    return target == base or target.startswith(base + os.sep)
+
+
+def compare_version(a, b):
+    """比较两个语义化版本字符串，返回 -1/0/1。非规范版本按字符串比较。"""
+    def norm(v):
+        parts = re.split(r"[.-]", str(v or ""))
+        nums = []
+        for p in parts:
+            m = re.match(r"^(\d+)(.*)$", p)
+            if m:
+                nums.append((int(m.group(1)), m.group(2) or ""))
+            else:
+                nums.append((-1, p))
+        return nums
+    na, nb = norm(a), norm(b)
+    for (va, sa), (vb, sb) in zip(na, nb):
+        if va != vb:
+            return -1 if va < vb else 1
+        if sa != sb:
+            return -1 if sa < sb else 1
+    if len(na) != len(nb):
+        return -1 if len(na) < len(nb) else 1
+    return 0
+
+
+def fetch_skillhub_skill(base_url, slug, api_key=""):
+    """从 SkillHub 查询 skill 详情（最新版本等）。"""
+    url = f"{base_url}/api/v1/skills/{slug}"
+    req = urllib.request.Request(url, method="GET")
+    req.add_header("User-Agent", "WorkBuddyConsole/1.0")
+    req.add_header("Accept", "application/json")
+    if api_key:
+        req.add_header("Authorization", f"Bearer {api_key}")
+    with urllib.request.urlopen(req, timeout=20) as resp:
+        return json.loads(resp.read().decode("utf-8"))
+
+
+def strip_wrapped(text):
+    """去掉对话文本里被系统标签包裹的上下文（system-reminder / user_info / identity_context）。"""
+    text = re.sub(r"<system-reminder[\s\S]*?system-reminder>", "", text, flags=re.IGNORECASE)
+    text = re.sub(r"<user_info[\s\S]*?user_info>", "", text, flags=re.IGNORECASE)
+    text = re.sub(r"<identity_context[\s\S]*?identity_context>", "", text, flags=re.IGNORECASE)
+    return text.strip()
+
+
+def extract_session_title(f: Path, limit=50):
+    """取会话首条用户消息作为标题。"""
     try:
-        srv.serve_forever()
-    except KeyboardInterrupt:
-        srv.shutdown()
+        for line in f.read_text(encoding="utf-8").splitlines():
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                obj = json.loads(line)
+            except Exception:
+                continue
+            if obj.get("type") == "message" and obj.get("role") == "user":
+                c = obj.get("content")
+                if isinstance(c, list):
+                    for part in c:
+                        if isinstance(part, dict) and part.get("type") == "input_text":
+                            t = strip_wrapped(part.get("text", ""))
+                            if t:
+                                return t[:limit]
+    except Exception:
+        pass
+    return f.stem
+
+
+def _fmt_time(ts):
+    try:
+        return datetime.fromtimestamp(ts).strftime("%Y-%m-%d %H:%M")
+    except Exception:
+        return ""
+
+
+def extract_conversation_text(path: Path, limit=12000):
+    """从 jsonl 会话文件提取可读对话文本（user/assistant 消息 + 简短思考）。"""
+    parts = []
+    try:
+        for line in path.read_text(encoding="utf-8").splitlines():
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                obj = json.loads(line)
+            except Exception:
+                continue
+            t = obj.get("type")
+            if t == "message":
+                role = obj.get("role")
+                c = obj.get("content")
+                if isinstance(c, list):
+                    for part in c:
+                        if not isinstance(part, dict):
+                            continue
+                        if part.get("type") == "input_text" and role == "user":
+                            txt = strip_wrapped(part.get("text", ""))
+                            if txt:
+                                parts.append("用户: " + txt)
+                        elif part.get("type") == "output_text" and role == "assistant":
+                            txt = part.get("text", "")
+                            if txt.strip():
+                                parts.append("助手: " + txt)
+            elif t == "reasoning":
+                rc = obj.get("rawContent") or obj.get("content")
+                if isinstance(rc, list):
+                    for part in rc:
+                        if isinstance(part, dict) and part.get("type") == "reasoning_text":
+                            txt = part.get("text", "")
+                            if txt.strip():
+                                parts.append("[思考] " + txt[:400])
+    except Exception:
+        pass
+    joined = "\n".join(parts)
+    if len(joined) > limit:
+        joined = joined[:limit] + "\n…(已截断)"
+    return joined
+
+
+def summarize_text(text, llm):
+    """用 LLM 生成对话结构化摘要；未配置或失败时回退到本地规则摘要。"""
+    if text.strip():
+        base_url = (llm.get("base_url") or "").rstrip("/")
+        api_key = llm.get("api_key") or ""
+        model = llm.get("model") or "gpt-4o"
+        if base_url and api_key:
+            try:
+                import urllib.request
+                sys_p = ("你是一个对话记录整理助手。请阅读下面的对话记录，提炼成结构化中文摘要，"
+                         "包含：1) 主题；2) 用户的目标/需求；3) 关键决策与产出；4) 涉及的文件/命令；"
+                         "5) 待办/遗留事项。若信息不足则写“无”。简洁，不超过 400 字。")
+                body = json.dumps({"model": model,
+                                   "messages": [{"role": "system", "content": sys_p},
+                                                {"role": "user", "content": text}]}).encode("utf-8")
+                req = urllib.request.Request(f"{base_url}/chat/completions", data=body, method="POST")
+                req.add_header("Authorization", f"Bearer {api_key}")
+                req.add_header("Content-Type", "application/json")
+                with urllib.request.urlopen(req, timeout=120) as resp:
+                    data = json.loads(resp.read().decode("utf-8"))
+                    content = data["choices"][0]["message"]["content"]
+                    return content.strip(), True
+            except Exception:
+                pass
+    lines = [l for l in text.splitlines() if l.strip()][:30]
+    return "（未使用 AI，本地规则提取）\n" + "\n".join(lines), False
+
+
+def run(port=8080):
+    print(f"WorkBuddy Console Server: http://127.0.0.1:{port}")
+    HTTPServer(("127.0.0.1", port), APIHandler).serve_forever()
 
 
 if __name__ == "__main__":
-    main()
+    port = int(sys.argv[1]) if len(sys.argv) > 1 else 8080
+    run(port)
