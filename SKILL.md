@@ -12,7 +12,7 @@ agent_created: true
 ## 二、描述
 你是一个本地 Agent 零件管理员，同时是用户 WorkBuddy 环境的「控制台」。两件事一体：
 
-1. **管控台（主交付物）**：安装并调用本 Skill 后，直接在浏览器打开 `console.html`，统一管理已装 Skill（健康度 / 升级 / 删除 / 使用频率）、存储空间（日志 / 会话 / 缓存明细与清理）、历史对话（按项目 / 时间浏览 + 全文检索）、以及设置（主题 / 环境 / LLM / SkillHub）。
+1. **管控台（主交付物）**：安装并调用本 Skill 后，直接在浏览器打开 `console.html`，首屏即「Agent 全景驾驶舱」一屏概览（KPI / 存储 / 健康 / 零件分类 / 人偶胶囊 / 可操作建议 / Token 排行 / 生命周期动作），并统一管理已装 Skill（健康度 / 升级 / 删除 / 使用频率）、存储空间（日志 / 会话 / 缓存明细与清理）、历史对话（按项目 / 时间浏览 + 全文检索）、以及设置（主题 / 环境 / LLM / SkillHub）。
 2. **零件工坊（引擎）**：用户的模糊想法被澄清成需求文档，系统从零件库检索匹配组件，做冲突二选一与依赖补全，拼出新 Skill；新 Skill 还能被自动拆回零件库，形成「越用越满」的积累闭环。拼装记录直接进入控制台的「Skill生成记录」板块，无需另开文件。
 
 所有零件与生成记录通过管控台的「模板库 / Skill生成记录 / 任务拆解」视图呈现，用户一眼看清自己的 Agent 由什么构成、每个零件被谁用过。
@@ -46,6 +46,7 @@ agent_created: true
 │   ├── tools/                # 依赖工具
 │   └── reference/            # 参考文档
 ├── generations/              # 每次组装产物（manifest.json + SKILL.md）
+├── tests/                    # pytest 全量测试（隔离 ~/.workbuddy，安全可重复）
 ├── assets/
 │   └── sprite_avatar.png     # 控制台头像
 ├── scripts/
@@ -108,3 +109,5 @@ agent_created: true
 - 检索为关键词/语法级，语义级匹配为可选增强；组装时由你结合检索结果做最终判断。
 - `dismantle.py` 提供确定性机械解析（按 `##` 章节拆分 + 关键词猜类别），AI 语义归类与审核由你在运行时完成。
 - `shop.html` / `generate_shop.py` 为早期解剖图方案，已并入控制台视图，**默认不再使用**；仅在需要离线解剖图快照时可手动 `python scripts/generate_shop.py <skill-root>` 生成。
+- `scan_console.py` / `build_data.py` 探测 WorkBuddy 家目录时，优先读取环境变量 `WORKBUDDY_ROOT`，其次检查 `~/.workbuddy` 或 WSL 对应 Windows 目录下的 `workbuddy.db` / `skills/` sentinel，避免误扫无关大目录。
+- 项目包含 pytest 全量测试；调用本 Skill 前可运行 `python3 -m pytest -v` 验证环境，测试全程使用隔离的临时目录，不会触碰真实 `~/.workbuddy`。

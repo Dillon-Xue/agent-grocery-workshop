@@ -16,7 +16,7 @@
 - 依赖补全：自动补齐 `depends_on` 闭包。
 - 组装生成：输出选用零件清单 + 组装说明 + 新 Skill 文件 + manifest。
 - 自动拆解回填：新 Skill 生成后自动解析回零件库，闭环积累。
-- 管控台可视化：Skill 健康度 / 升级 / 删除、存储清理、历史对话检索，以及零件「模板库 / Skill生成记录 / 任务拆解」视图（平铺 + 折叠、悬停浮窗、详情页反向关联 + 同源伙伴）。
+- 管控台可视化：一屏「Agent 全景驾驶舱」概览（KPI / 存储 / 健康 / 零件分类 / 人偶胶囊 / 可操作建议 / Token 排行 / 生命周期动作），以及 Skill 健康度 / 升级 / 删除、存储清理、历史对话检索，零件「模板库 / Skill生成记录 / 任务拆解」视图（平铺 + 折叠、悬停浮窗、详情页反向关联 + 同源伙伴）。
 
 ## 四、架构
 纯文件 + 脚本，无服务、无数据库。agent 自身即引擎，脚本承担确定性机械工作。
@@ -27,6 +27,7 @@
 ├── README.md
 ├── library/          # 零件库（数据永久保留，按 ASCII 子目录分 6 大类）
 ├── generations/      # 每次组装产物（manifest.json + SKILL.md）
+├── tests/            # pytest 全量测试（工作坊 + 管控台 + 集成）
 ├── scripts/
 │   ├── workshop.py           # 核心库
 │   ├── scan_console.py       # 扫描 ~/.workbuddy，内联数据进 console.html
@@ -125,4 +126,27 @@ python scripts/generate_shop.py .
 ---
 
 > 💡 **核心体验**：你说需求 → 我问清楚 → 自动挑零件 → 组装出新 Skill → 拆解回填让零件库更富 → 下次组装选择更多。越用越强。
+
+## 测试
+
+项目自带 pytest 全量测试，覆盖零件工坊、管控台后端纯函数与端到端集成流程：
+
+```bash
+python3 -m pytest -v
+```
+
+主要测试文件：
+
+- `tests/test_workshop.py`：零件加载、检索、冲突检测、依赖补全、反向关联。
+- `tests/test_console.py`：`build_data` 快照结构、`server.py` 路径安全、版本比较。
+- `tests/test_generate_shop.py`：shop.html 渲染与内嵌 JS 语法检查（依赖 node）。
+- `tests/test_integration.py`：需求澄清 → 检索组装 → 落盘生成 → 拆解回填完整流程。
+- `tests/test_seed.py`：初始种子零件写入。
+- `tests/test_dismantle.py`：SKILL.md 解析为候选零件。
+
+测试默认使用隔离的临时 WorkBuddy 家目录，不会扫描真实的 `~/.workbuddy`。如需在脚本中指定家目录，可设置环境变量：
+
+```bash
+WORKBUDDY_ROOT=/path/to/.workbuddy python scripts/scan_console.py
+```
 
