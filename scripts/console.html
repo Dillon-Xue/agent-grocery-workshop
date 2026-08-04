@@ -634,7 +634,7 @@ tbody tr:hover{background:var(--surface-2)}
 .dash-proto .capsule{position:absolute;transform:translate(-50%,-50%);border-radius:999px;padding:5px 11px;font-size:10px;font-weight:600;background:rgba(6,10,16,.72);border:1px solid;backdrop-filter:blur(6px);box-shadow:0 6px 16px rgba(0,0,0,.35);white-space:nowrap;z-index:0;animation:capFloat 5s ease-in-out infinite;font-family:var(--dp-body);cursor:pointer;transition:.2s}
 .dash-proto .capsule:hover{transform:translate(-50%,-55%) scale(1.06);z-index:1;background:rgba(6,10,16,.92)}
 .dash-proto .capsule small{opacity:.7;font-weight:400;font-size:9px;margin-left:3px;font-family:var(--dp-display)}
-@keyframes capFloat{0%,100%{translate:0 0}50%{translate:0 -6px}}
+@keyframes capFloat{0%{translate:0 0}25%{translate:11px -4px}50%{translate:0 -8px}75%{translate:-11px -3px}100%{translate:0 0}}
 
 #dp-tooltip{position:fixed;z-index:1000;max-width:240px;padding:8px 10px;border-radius:8px;background:rgba(8,13,22,.95);border:1px solid rgba(34,211,238,.25);color:var(--text);font-size:11px;line-height:1.5;box-shadow:0 10px 30px rgba(0,0,0,.5);backdrop-filter:blur(8px);pointer-events:none;opacity:0;transition:opacity .15s;white-space:normal}
 #dp-tooltip.visible{opacity:1}
@@ -1534,6 +1534,8 @@ function placeCapsules(mode='toast'){
       if(!p) return;
       const el=document.createElement('div');
       el.className='capsule';
+      el.style.animationDuration=(7.5+Math.random()*4.5).toFixed(2)+'s';
+      el.style.animationDelay=(-Math.random()*8).toFixed(2)+'s';
       el.style.left=p.x+'px'; el.style.top=p.y+'px';
       const c=colors[i%colors.length];
       el.style.borderColor=c; el.style.color=c;
