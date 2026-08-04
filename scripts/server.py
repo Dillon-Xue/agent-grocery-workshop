@@ -18,7 +18,7 @@ from urllib.parse import parse_qs, urlparse
 # ── 配置 ──
 WORKBUDDY_ROOT = Path.home() / ".workbuddy"
 SKILLS_DIR = WORKBUDDY_ROOT / "skills"
-BASE_DIR = Path(__file__).resolve().parent
+BASE_DIR = Path(__file__).resolve().parent.parent
 CONFIG_FILE = BASE_DIR / "console_config.json"
 BACKUP_DIR = WORKBUDDY_ROOT / "console-backups"
 
@@ -100,8 +100,8 @@ class APIHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         parsed = urlparse(self.path)
         path = parsed.path
-        if path == "/":
-            path = "/console.html"
+        if path in ("/", "/console.html"):
+            path = "/scripts/console.html"
         if path == "/api/config":
             return self._json({"ok": True, "config": {**CONFIG.get("llm", {}), "skillhub": CONFIG.get("skillhub", {})}})
         if path.startswith("/api/"):
@@ -125,6 +125,9 @@ class APIHandler(BaseHTTPRequestHandler):
         self.send_response(200)
         self.send_header("Content-Type", content_type)
         self.send_header("Content-Length", str(len(data)))
+        self.send_header("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0")
+        self.send_header("Pragma", "no-cache")
+        self.send_header("Expires", "0")
         self.end_headers()
         self.wfile.write(data)
 
@@ -801,8 +804,8 @@ def summarize_text(text, llm):
 
 
 def run(port=8080):
-    print(f"WorkBuddy Console Server: http://127.0.0.1:{port}")
-    HTTPServer(("127.0.0.1", port), APIHandler).serve_forever()
+    print(f"WorkBuddy Console Server: http://0.0.0.0:{port}")
+    HTTPServer(("0.0.0.0", port), APIHandler).serve_forever()
 
 
 if __name__ == "__main__":
