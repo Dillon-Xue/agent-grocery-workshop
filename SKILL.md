@@ -46,6 +46,7 @@ agent_created: true
 │   ├── tools/                # 依赖工具
 │   └── reference/            # 参考文档
 ├── generations/              # 每次组装产物（manifest.json + SKILL.md）
+├── tests/                    # pytest 全量测试（隔离 ~/.workbuddy，安全可重复）
 ├── assets/
 │   └── sprite_avatar.png     # 控制台头像
 ├── scripts/
@@ -108,3 +109,5 @@ agent_created: true
 - 检索为关键词/语法级，语义级匹配为可选增强；组装时由你结合检索结果做最终判断。
 - `dismantle.py` 提供确定性机械解析（按 `##` 章节拆分 + 关键词猜类别），AI 语义归类与审核由你在运行时完成。
 - `shop.html` / `generate_shop.py` 为早期解剖图方案，已并入控制台视图，**默认不再使用**；仅在需要离线解剖图快照时可手动 `python scripts/generate_shop.py <skill-root>` 生成。
+- `scan_console.py` / `build_data.py` 探测 WorkBuddy 家目录时，优先读取环境变量 `WORKBUDDY_ROOT`，其次检查 `~/.workbuddy` 或 WSL 对应 Windows 目录下的 `workbuddy.db` / `skills/` sentinel，避免误扫无关大目录。
+- 项目包含 pytest 全量测试；调用本 Skill 前可运行 `python3 -m pytest -v` 验证环境，测试全程使用隔离的临时目录，不会触碰真实 `~/.workbuddy`。

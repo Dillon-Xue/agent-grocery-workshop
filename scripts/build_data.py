@@ -25,18 +25,35 @@ import datetime
 from pathlib import Path
 
 
+def _is_valid_wb_root(path: str) -> bool:
+    """通过 sentinel 文件/目录判断 path 是否像真实 WorkBuddy 家目录，
+    避免把任意存在的大目录当作家目录扫描。"""
+    if not os.path.isdir(path):
+        return False
+    return os.path.isfile(os.path.join(path, "workbuddy.db")) or \
+        os.path.isdir(os.path.join(path, "skills"))
+
+
 def detect_wb_root():
-    """WSL 环境下指向 Windows 用户目录；否则用本机 ~/.workbuddy。
-    可用环境变量 WORKBUDDY_ROOT 覆盖（测试隔离用）。"""
+    """探测 WorkBuddy 家目录。
+
+    优先级：
+    1. 环境变量 WORKBUDDY_ROOT（测试/脚本指定）。
+    2. 本机 ~/.workbuddy（需含 workbuddy.db 或 skills/ sentinel）。
+    3. WSL 下 Windows 用户目录 /mnt/c/Users/dillon/.workbuddy（同上 sentinel）。
+    4. 回退 ~/.workbuddy（可能不存在，调用方需处理缺失）。
+
+    用 sentinel 校验是为了防止把只是存在的普通大目录扫一遍，
+    导致测试/首次运行卡死。"""
     env = os.environ.get("WORKBUDDY_ROOT")
     if env:
         return env
-    wsl_win = "/mnt/c/Users/dillon/.workbuddy"
-    if os.path.isdir(wsl_win):
-        return wsl_win
     home = os.path.expanduser("~/.workbuddy")
-    if os.path.isdir(home):
+    if _is_valid_wb_root(home):
         return home
+    wsl_win = "/mnt/c/Users/dillon/.workbuddy"
+    if _is_valid_wb_root(wsl_win):
+        return wsl_win
     return home
 
 
