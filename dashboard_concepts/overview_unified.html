@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Agent 全景驾驶舱 · 一屏概览</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;600;700&family=Sora:wght@300;400;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#020407;
+  --panel:rgba(12,18,28,.82);
+  --border:rgba(255,255,255,.10);
+  --text:#f0f4f8;
+  --muted:#8b9aae;
+  --cyan:#00f0ff;
+  --cyan-dim:rgba(0,240,255,.16);
+  --amber:#ffbf52;
+  --amber-dim:rgba(255,191,82,.16);
+  --green:#2af598;
+  --green-dim:rgba(42,245,152,.16);
+  --red:#ff5a7a;
+  --red-dim:rgba(255,90,122,.16);
+  --purple:#c084fc;
+  --blue:#4facfe;
+  --font-display:'Chakra Petch',sans-serif;
+  --font-body:'Sora',sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;overflow:hidden}
+body{font-family:var(--font-body);background:var(--bg);color:var(--text)}
+body::before,body::after{content:'';position:fixed;inset:0;pointer-events:none;z-index:0}
+body::before{background-image:linear-gradient(rgba(0,240,255,.035) 1px,transparent 1px),linear-gradient(90deg,rgba(0,240,255,.035) 1px,transparent 1px);background-size:44px 44px;mask-image:radial-gradient(ellipse at 50% 0%,black 0%,transparent 80%)}
+body::after{background:radial-gradient(1100px 520px at 50% -10%,rgba(0,240,255,.07),transparent 60%),radial-gradient(700px 420px at 0% 100%,rgba(192,132,252,.05),transparent 55%)}
+
+.app{position:relative;z-index:1;height:100vh;display:flex;flex-direction:column;padding:12px 18px 10px;gap:9px}
+
+/* Top */
+.topbar{flex:0 0 auto;display:flex;align-items:center;justify-content:space-between;padding:4px 0 6px;border-bottom:1px solid var(--border)}
+.brand .eyebrow{font-family:var(--font-display);font-size:10px;letter-spacing:2.5px;color:var(--cyan);text-transform:uppercase}
+.brand h1{font-family:var(--font-display);font-size:20px;font-weight:700;letter-spacing:-.5px;background:linear-gradient(135deg,#fff 0%,var(--cyan) 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.brand p{font-size:10px;color:var(--muted);margin-top:1px;max-width:380px}
+.status-pill{display:flex;align-items:center;gap:6px;padding:5px 10px;border-radius:999px;background:var(--green-dim);border:1px solid rgba(42,245,152,.32);font-size:10px;color:var(--green);font-family:var(--font-display);text-transform:uppercase;letter-spacing:.8px}
+.pulse{width:6px;height:6px;border-radius:50%;background:var(--green);box-shadow:0 0 0 0 rgba(42,245,152,.7);animation:pulse 2s infinite}
+@keyframes pulse{0%{transform:scale(.95);box-shadow:0 0 0 0 rgba(42,245,152,.7)}70%{transform:scale(1);box-shadow:0 0 0 6px rgba(42,245,152,.0)}100%{transform:scale(.95);box-shadow:0 0 0 0 rgba(42,245,152,.0)}}
+
+/* Cards */
+.card{background:var(--panel);border:1px solid var(--border);border-radius:14px;backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);box-shadow:0 14px 34px rgba(0,0,0,.32),inset 0 1px 0 rgba(255,255,255,.05);transition:.2s ease;display:flex;flex-direction:column;min-width:0}
+.card:hover{border-color:rgba(0,240,255,.28);box-shadow:0 18px 44px rgba(0,0,0,.38),0 0 24px rgba(0,240,255,.05)}
+.card-head{flex:0 0 auto;display:flex;align-items:center;gap:6px;padding:9px 12px 0;font-family:var(--font-display);font-size:10px;letter-spacing:1.2px;text-transform:uppercase;color:var(--muted);white-space:nowrap}
+.card-head .right{margin-left:auto;font-family:var(--font-body);font-size:9px;letter-spacing:0;text-transform:none;background:rgba(255,255,255,.06);padding:2px 6px;border-radius:5px}
+.card-body{flex:1;padding:7px 12px 11px;display:flex;flex-direction:column;justify-content:center;min-height:0;overflow:hidden}
+.col .card{flex:1 1 0}
+
+/* KPI */
+.kpi-row{flex:0 0 auto;display:grid;grid-template-columns:repeat(6,1fr);gap:9px}
+.kpi{padding:9px;position:relative;overflow:hidden;cursor:default}
+.kpi::before{content:'';position:absolute;inset:0;border-radius:14px;padding:1px;background:linear-gradient(135deg,rgba(0,240,255,.3),transparent 45%,transparent 55%,rgba(255,255,255,.08));-webkit-mask:linear-gradient(#fff 0 0) content-box,linear-gradient(#fff 0 0);-webkit-mask-composite:xor;mask-composite:exclude;pointer-events:none}
+.kpi .ico{width:24px;height:24px;border-radius:6px;display:grid;place-items:center;font-size:13px;background:rgba(255,255,255,.05);margin-bottom:5px}
+.kpi.c-cyan .ico{background:var(--cyan-dim);color:var(--cyan)}
+.kpi.c-purple .ico{background:rgba(192,132,252,.15);color:var(--purple)}
+.kpi.c-amber .ico{background:var(--amber-dim);color:var(--amber)}
+.kpi.c-green .ico{background:var(--green-dim);color:var(--green)}
+.kpi.c-blue .ico{background:rgba(79,172,254,.15);color:var(--blue)}
+.kpi.c-red .ico{background:var(--red-dim);color:var(--red)}
+.kpi .val{font-family:var(--font-display);font-size:18px;font-weight:700;letter-spacing:-.5px}
+.kpi .lab{font-size:9px;color:var(--muted);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.kpi .sub{font-size:8px;color:var(--muted);margin-top:1px;font-family:var(--font-display);opacity:.75}
+
+/* Main grid */
+.main-grid{flex:1 1 0;display:grid;grid-template-columns:230px 1fr 230px;gap:10px;min-height:0}
+.col{display:flex;flex-direction:column;gap:10px;min-width:0;min-height:0}
+
+/* Donut */
+.donut-wrap{display:flex;align-items:center;gap:9px}
+.donut{position:relative;width:74px;height:74px;border-radius:50%;flex-shrink:0;background:conic-gradient(var(--cyan) 0deg 151deg,var(--purple) 151deg 252deg,var(--amber) 252deg 331deg,var(--green) 331deg 360deg);box-shadow:0 0 14px rgba(0,240,255,.12)}
+.donut::after{content:'';position:absolute;inset:18px;border-radius:50%;background:var(--panel);border:1px solid var(--border)}
+.donut .center{position:absolute;inset:0;display:grid;place-items:center;text-align:center;z-index:1}
+.donut .center .big{font-family:var(--font-display);font-size:15px;font-weight:700}
+.donut .center .small{font-size:7px;color:var(--muted);letter-spacing:.8px}
+.legend{flex:1;display:flex;flex-direction:column;gap:4px}
+.legend .row{display:flex;align-items:center;gap:5px;font-size:9px;white-space:nowrap}
+.legend .dot{width:6px;height:6px;border-radius:2px}
+.legend .nm{color:var(--muted);flex:1;overflow:hidden;text-overflow:ellipsis}
+.legend .vl{font-family:var(--font-display)}
+
+/* Bars */
+.bar-row{display:flex;align-items:center;gap:7px;font-size:9px;margin-bottom:5px;white-space:nowrap;cursor:default}
+.bar-row:last-child{margin-bottom:0}
+.bar-row .nm{width:54px;color:var(--muted);overflow:hidden;text-overflow:ellipsis}
+.bar-row .track{flex:1;height:5px;background:rgba(255,255,255,.06);border-radius:3px;overflow:hidden;min-width:36px}
+.bar-row .fill{height:100%;border-radius:3px;box-shadow:0 0 5px currentColor}
+.bar-row .vl{width:28px;text-align:right;font-family:var(--font-display);font-size:9px}
+
+/* Category inventory */
+.cat-row{display:flex;align-items:center;gap:7px;font-size:9px;margin-bottom:4px;white-space:nowrap}
+.cat-row:last-child{margin-bottom:0}
+.cat-row .nm{width:52px;color:var(--muted);overflow:hidden;text-overflow:ellipsis}
+.cat-row .track{flex:1;height:4px;background:rgba(255,255,255,.06);border-radius:3px;overflow:hidden}
+.cat-row .fill{height:100%;border-radius:3px}
+.cat-row .vl{width:22px;text-align:right;font-family:var(--font-display)}
+
+/* Arena */
+.arena-wrap{display:flex;flex-direction:column;min-width:0;min-height:0}
+.arena{position:relative;flex:1 1 0;border-radius:18px;overflow:visible;min-height:0;background:radial-gradient(ellipse at 50% 100%,rgba(0,240,255,.13) 0%,transparent 55%),radial-gradient(ellipse at 20% 20%,rgba(192,132,252,.09) 0%,transparent 45%),radial-gradient(ellipse at 80% 30%,rgba(42,245,152,.06) 0%,transparent 40%),linear-gradient(180deg,rgba(0,240,255,.03),rgba(192,132,252,.03)),var(--panel)}
+.arena .avatar{position:absolute;left:50%;bottom:-10px;transform:translateX(-50%);height:96%;width:auto;z-index:1;pointer-events:none;filter:drop-shadow(0 0 36px rgba(0,240,255,.3)) drop-shadow(0 0 70px rgba(192,132,252,.14))}
+.capsule{position:absolute;transform:translate(-50%,-50%);border-radius:999px;padding:6px 11px;font-size:10px;font-weight:600;background:rgba(6,10,16,.85);border:1px solid;backdrop-filter:blur(6px);box-shadow:0 6px 16px rgba(0,0,0,.35);white-space:nowrap;z-index:3;animation:float 5s ease-in-out infinite;font-family:var(--font-body);cursor:pointer;transition:.2s}
+.capsule:hover{transform:translate(-50%,-55%) scale(1.04);z-index:10}
+.capsule small{opacity:.7;font-weight:400;font-size:9px;margin-left:3px;font-family:var(--font-display)}
+.capsule.c1{border-color:var(--cyan);color:var(--cyan);top:11%;left:12%;animation-delay:0s}
+.capsule.c2{border-color:var(--purple);color:var(--purple);top:24%;right:7%;animation-delay:.8s}
+.capsule.c3{border-color:var(--green);color:var(--green);top:44%;left:5%;animation-delay:1.6s}
+.capsule.c4{border-color:var(--amber);color:var(--amber);top:58%;right:5%;animation-delay:2.4s}
+.capsule.c5{border-color:var(--blue);color:var(--blue);bottom:22%;left:12%;animation-delay:3.2s}
+.capsule.c6{border-color:var(--red);color:var(--red);bottom:15%;right:10%;animation-delay:4s}
+@keyframes float{0%,100%{translate:0 0}50%{translate:0 -6px}}
+
+/* Alerts */
+.alert-item{display:flex;gap:6px;align-items:flex-start;padding:7px;border-radius:8px;background:rgba(255,255,255,.04);margin-bottom:5px;font-size:9.5px;border-left:2px solid transparent;cursor:default;transition:.2s}
+.alert-item:last-child{margin-bottom:0}
+.alert-item:hover{background:rgba(255,255,255,.08)}
+.alert-item .ico{font-size:12px;flex-shrink:0;margin-top:1px}
+.alert-item .txt{line-height:1.45}
+.alert-item .txt b{color:var(--text);font-weight:600}
+.alert-item.danger{border-left-color:var(--red)}
+.alert-item.warn{border-left-color:var(--amber)}
+.alert-item.info{border-left-color:var(--cyan)}
+
+/* Bottom */
+.bottom-row{flex:0 0 auto;display:grid;grid-template-columns:repeat(6,1fr);gap:9px;height:104px}
+.mini{padding:9px;text-align:center;display:flex;flex-direction:column;justify-content:center;cursor:default}
+.mini .mk-lab{font-size:8px;color:var(--muted);letter-spacing:1px;text-transform:uppercase;font-family:var(--font-display)}
+.mini .mk-val{font-family:var(--font-display);font-size:18px;font-weight:700;margin:2px 0 1px}
+.mini .mk-sub{font-size:8px;color:var(--muted)}
+.rec{grid-column:span 2;text-align:left;padding:0;overflow:hidden}
+.rec .card-head{padding:8px 12px 6px;border-bottom:1px solid var(--border);background:rgba(255,255,255,.02)}
+.rec-list{padding:5px 12px 7px}
+.rec-item{display:flex;align-items:center;gap:7px;font-size:9.5px;padding:5px 0;border-bottom:1px solid rgba(255,255,255,.05);cursor:default;transition:.2s}
+.rec-item:last-child{border-bottom:none}
+.rec-item:hover{background:rgba(255,255,255,.04);border-radius:6px}
+.rec-item .txt{flex:1;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rec-item .txt b{color:var(--text);font-weight:600}
+.rec-item .btn{margin-left:auto;padding:3px 9px;border-radius:6px;border:1px solid var(--border);background:rgba(255,255,255,.05);color:var(--text);font-size:9px;font-family:var(--font-display);text-transform:uppercase;letter-spacing:.4px;cursor:pointer;transition:.2s;white-space:nowrap;flex-shrink:0}
+.rec-item .btn:hover{border-color:var(--cyan);color:var(--cyan)}
+.rec-item .btn.primary{background:var(--cyan);border-color:var(--cyan);color:#001015;font-weight:700}
+.rec-item .btn.warn{background:var(--amber-dim);border-color:rgba(255,191,82,.3);color:var(--amber)}
+
+/* Tooltip */
+#tooltip{position:fixed;z-index:1000;max-width:240px;padding:8px 10px;border-radius:8px;background:rgba(8,13,22,.95);border:1px solid rgba(0,240,255,.25);color:var(--text);font-size:11px;line-height:1.5;box-shadow:0 10px 30px rgba(0,0,0,.5);backdrop-filter:blur(8px);pointer-events:none;opacity:0;transition:opacity .15s;white-space:normal}
+#tooltip.visible{opacity:1}
+#tooltip b{display:block;font-weight:600;margin-bottom:2px;color:var(--cyan)}
+
+/* Modal */
+#modalOverlay{position:fixed;inset:0;z-index:2000;background:rgba(0,0,0,.65);backdrop-filter:blur(4px);display:none;align-items:center;justify-content:center;padding:20px}
+#modalOverlay.active{display:flex}
+#modal{width:360px;max-width:100%;background:var(--panel);border:1px solid var(--border);border-radius:18px;padding:18px;box-shadow:0 30px 80px rgba(0,0,0,.6);position:relative}
+#modal .close{position:absolute;top:12px;right:12px;width:26px;height:26px;border-radius:50%;border:1px solid var(--border);background:rgba(255,255,255,.05);color:var(--muted);cursor:pointer;display:grid;place-items:center;font-size:14px;transition:.2s}
+#modal .close:hover{border-color:var(--cyan);color:var(--cyan)}
+#modal h3{font-family:var(--font-display);font-size:16px;margin-bottom:4px}
+#modal .meta{font-size:10px;color:var(--muted);margin-bottom:12px}
+#modal .row{display:flex;justify-content:space-between;font-size:11px;padding:7px 0;border-bottom:1px solid rgba(255,255,255,.06)}
+#modal .row:last-child{border-bottom:none}
+#modal .row span{color:var(--muted)}
+#modal .row strong{font-family:var(--font-display);font-weight:600}
+#modal .desc{font-size:11px;color:var(--muted);line-height:1.6;margin-top:12px;padding-top:12px;border-top:1px solid rgba(255,255,255,.08)}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="topbar">
+    <div class="brand">
+      <div class="eyebrow">WorkBuddy · Agent Command Deck</div>
+      <h1>Agent 全景驾驶舱</h1>
+      <p>一屏查看全部：资产 · 健康 · 流水线 · 可执行建议</p>
+    </div>
+    <div class="status-pill"><span class="pulse"></span> Live</div>
+  </div>
+
+  <div class="kpi-row">
+    <div class="card kpi c-cyan" data-tip="本地总占用 12.4 GB&#10;较上周 +3%&#10;主要来源：日志/追踪 5.1 GB"><div class="ico">💽</div><div class="val">12.4 GB</div><div class="lab">本地总占用</div><div class="sub">+3%</div></div>
+    <div class="card kpi c-purple" data-tip="已安装 42 个 Skill&#10;其中 5 个 Token 超过 6k（偏胖）&#10;建议定期审查"><div class="ico">🧩</div><div class="val">42</div><div class="lab">已装 Skill</div><div class="sub">5 偏胖</div></div>
+    <div class="card kpi c-amber" data-tip="30 天未使用的 Skill 共 8 个&#10;可释放空间并降低管理成本"><div class="ico">🧹</div><div class="val">8</div><div class="lab">待清理 Skill</div><div class="sub">30天未用</div></div>
+    <div class="card kpi c-green" data-tip="近 7 天对话 1,247 条&#10;近 30 天累计 4,832 条&#10;活跃度较上周 +12%"><div class="ico">💬</div><div class="val">1,247</div><div class="lab">近 7 天对话</div><div class="sub">30天 4,832</div></div>
+    <div class="card kpi c-blue" data-tip="工坊模板 127 个&#10;覆盖 6 大分类&#10;零件复用率 68%"><div class="ico">📦</div><div class="val">127</div><div class="lab">工坊模板</div><div class="sub">6 分类</div></div>
+    <div class="card kpi c-red" data-tip="当前 2 条安全提示&#10;1 个高风险 Skill 含提权/动态执行&#10;建议立即审查"><div class="ico">🛡️</div><div class="val">2</div><div class="lab">安全提示</div><div class="sub">1 高风险</div></div>
+  </div>
+
+  <div class="main-grid">
+    <div class="col">
+      <div class="card" data-tip="存储分布总览&#10;中心 86 分为 Agent 综合健康分">
+        <div class="card-head">存储分布 <span class="right">12.4 GB</span></div>
+        <div class="card-body">
+          <div class="donut-wrap">
+            <div class="donut"><div class="center"><div class="big">86</div><div class="small">HEALTH</div></div></div>
+            <div class="legend">
+              <div class="row" data-tip="日志与追踪数据&#10;占用 5.1 GB"><span class="dot" style="background:var(--cyan)"></span><span class="nm">日志/追踪</span><span class="vl">5.1 GB</span></div>
+              <div class="row" data-tip="Skill 目录总大小&#10;占用 3.4 GB"><span class="dot" style="background:var(--purple)"></span><span class="nm">Skill 目录</span><span class="vl">3.4 GB</span></div>
+              <div class="row" data-tip="会话与缓存文件&#10;占用 2.1 GB"><span class="dot" style="background:var(--amber)"></span><span class="nm">会话/缓存</span><span class="vl">2.1 GB</span></div>
+              <div class="row" data-tip="运行依赖与虚拟环境&#10;占用 1.8 GB"><span class="dot" style="background:var(--green)"></span><span class="nm">运行依赖</span><span class="vl">1.8 GB</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="card" data-tip="Skill 健康度分布&#10;基于使用频率、风险、体积综合评估">
+        <div class="card-head">Skill 健康度 <span class="right">42</span></div>
+        <div class="card-body">
+          <div class="bar-row" data-tip="33 个 Skill 状态良好&#10;建议继续保留"><div class="nm">保留</div><div class="track"><div class="fill" style="width:78%;background:var(--green);color:var(--green)"></div></div><div class="vl">33</div></div>
+          <div class="bar-row" data-tip="6 个 Skill 30 天未使用&#10;可考虑清理"><div class="nm">可删除</div><div class="track"><div class="fill" style="width:14%;background:var(--amber);color:var(--amber)"></div></div><div class="vl">6</div></div>
+          <div class="bar-row" data-tip="3 个 Skill 风险偏高或重复&#10;建议删除或合并"><div class="nm">建议删除</div><div class="track"><div class="fill" style="width:8%;background:var(--red);color:var(--red)"></div></div><div class="vl">3</div></div>
+        </div>
+      </div>
+      <div class="card" data-tip="零件库按 6 大分类分布&#10;反映当前可复用资产结构">
+        <div class="card-head">零件分类占比 <span class="right">127</span></div>
+        <div class="card-body">
+          <div class="cat-row" data-tip="代码开发类零件 38 个&#10;占比最高"><div class="nm">代码开发</div><div class="track"><div class="fill" style="width:78%;background:var(--cyan)"></div></div><div class="vl">38</div></div>
+          <div class="cat-row" data-tip="依赖工具类零件 27 个"><div class="nm">依赖工具</div><div class="track"><div class="fill" style="width:58%;background:var(--purple)"></div></div><div class="vl">27</div></div>
+          <div class="cat-row" data-tip="测试用例类零件 22 个"><div class="nm">测试用例</div><div class="track"><div class="fill" style="width:46%;background:var(--green)"></div></div><div class="vl">22</div></div>
+          <div class="cat-row" data-tip="需求分析类零件 18 个"><div class="nm">需求分析</div><div class="track"><div class="fill" style="width:38%;background:var(--amber)"></div></div><div class="vl">18</div></div>
+          <div class="cat-row" data-tip="方案设计类零件 14 个"><div class="nm">方案设计</div><div class="track"><div class="fill" style="width:30%;background:var(--blue)"></div></div><div class="vl">14</div></div>
+          <div class="cat-row" data-tip="参考文档类零件 8 个"><div class="nm">参考文档</div><div class="track"><div class="fill" style="width:18%;background:var(--red)"></div></div><div class="vl">8</div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="arena-wrap">
+      <div class="card arena">
+        <img class="avatar" src="sprite_avatar.png" alt="WorkBuddy">
+        <div class="capsule c1" data-skill='{"name":"数据分析助手","token":"12.4k","usage":"1,842","category":"代码开发","status":"高频","desc":"基于 pandas + SQL 的对话式数据分析 Skill，单次触发 token 较高，建议拆分为查询/可视化两个零件。"}'>数据分析助手 <small>12.4k</small></div>
+        <div class="capsule c2" data-skill='{"name":"存储清理","token":"8.1k","usage":"956","category":"依赖工具","status":"稳定","desc":"扫描并清理日志、缓存与旧备份，支持预览与一键回收站。"}'>存储清理 <small>8.1k</small></div>
+        <div class="capsule c3" data-skill='{"name":"会话搜索","token":"6.5k","usage":"742","category":"参考文档","status":"常用","desc":"基于关键词与会话元数据的本地聊天记录检索 Skill。"}'>会话搜索 <small>6.5k</small></div>
+        <div class="capsule c4" data-skill='{"name":"安全扫描","token":"5.2k","usage":"623","category":"测试用例","status":"稳定","desc":"使用正则与 AST 检测 Skill 中的危险命令与提权操作。"}'>安全扫描 <small>5.2k</small></div>
+        <div class="capsule c5" data-skill='{"name":"Skill工坊","token":"4.8k","usage":"518","category":"方案设计","status":"核心","desc":"自动检索零件、检测冲突与依赖并组装新 Skill。"}'>Skill工坊 <small>4.8k</small></div>
+        <div class="capsule c6" data-skill='{"name":"高风险Skill","token":"9.1k","usage":"12","category":"代码开发","status":"告警","desc":"触发安全规则的技能集合，含动态执行与提权调用，建议审查或隔离。"}'>高风险Skill <small>9.1k</small></div>
+      </div>
+    </div>
+
+    <div class="col">
+      <div class="card" data-tip="系统根据当前状态生成的 4 条可执行建议&#10;点击可进入对应处理页面">
+        <div class="card-head">可操作建议 <span class="right">4</span></div>
+        <div class="card-body" style="padding-top:5px">
+          <div class="alert-item danger" data-tip="风险详情：skill_http_runner 与 skill_code_exec 包含 eval / subprocess 调用，建议限制调用范围或增加白名单。"><span class="ico">🚨</span><div class="txt"><b>安全风险</b><br>2 个 Skill 含提权/动态执行</div></div>
+          <div class="alert-item warn" data-tip="清理对象：30 天前的追踪日志与过期缓存&#10;预计释放 1.2 GB"><span class="ico">🧹</span><div class="txt"><b>存储清理</b><br>日志可释放 1.2 GB</div></div>
+          <div class="alert-item info" data-tip="可升级 Skill：session_search v2.1、docker_helper v1.4&#10;新版本修复了 2 个已知问题"><span class="ico">🔄</span><div class="txt"><b>版本更新</b><br>3 个 Skill 有新版</div></div>
+          <div class="alert-item warn" data-tip="Token 偏胖 Skill：数据分析助手、存储清理等 5 个&#10;单次触发超过 6k token"><span class="ico">🔥</span><div class="txt"><b>Token 偏胖</b><br>5 个单次触发超 6k</div></div>
+        </div>
+      </div>
+      <div class="card" data-tip="基于文本长度估算的 Skill 单次触发 Token 消耗 TOP5&#10;实际消耗以 LLM 返回为准">
+        <div class="card-head">Token 消耗 TOP 5 <span class="right">估算</span></div>
+        <div class="card-body">
+          <div class="bar-row" data-tip="数据分析助手&#10;估算 12.4k / 次&#10;使用 1,842 次"><div class="nm">数据分析</div><div class="track"><div class="fill" style="width:92%;background:var(--amber);color:var(--amber)"></div></div><div class="vl">12.4k</div></div>
+          <div class="bar-row" data-tip="高风险 Skill 集合&#10;估算 9.1k / 次&#10;使用 12 次"><div class="nm">安全扫描</div><div class="track"><div class="fill" style="width:78%;background:var(--cyan);color:var(--cyan)"></div></div><div class="vl">9.1k</div></div>
+          <div class="bar-row" data-tip="存储清理&#10;估算 8.1k / 次&#10;使用 956 次"><div class="nm">存储清理</div><div class="track"><div class="fill" style="width:62%;background:var(--cyan);color:var(--cyan)"></div></div><div class="vl">8.1k</div></div>
+          <div class="bar-row" data-tip="会话搜索&#10;估算 6.5k / 次&#10;使用 742 次"><div class="nm">会话搜索</div><div class="track"><div class="fill" style="width:48%;background:var(--cyan);color:var(--cyan)"></div></div><div class="vl">6.5k</div></div>
+          <div class="bar-row" data-tip="Skill工坊&#10;估算 4.8k / 次&#10;使用 518 次"><div class="nm">Skill工坊</div><div class="track"><div class="fill" style="width:38%;background:var(--cyan);color:var(--cyan)"></div></div><div class="vl">4.8k</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="bottom-row">
+    <div class="card mini" data-tip="工坊零件模板总数 127 个&#10;分布于 6 大分类"><div class="mk-lab">总模板数</div><div class="mk-val">127</div><div class="mk-sub">6 大分类</div></div>
+    <div class="card mini" data-tip="已通过工坊组装生成的 Skill 34 个&#10;累计被调用 218 次"><div class="mk-lab">已组装</div><div class="mk-val">34</div><div class="mk-sub">使用 218 次</div></div>
+    <div class="card mini" data-tip="零件复用率 68%&#10;较上月提升 5%"><div class="mk-lab">复用率</div><div class="mk-val">68%</div><div class="mk-sub">+5%</div></div>
+    <div class="card mini" data-tip="近 7 天有对话的活跃项目 8 个"><div class="mk-lab">活跃项目</div><div class="mk-val">8</div><div class="mk-sub">近 7 天</div></div>
+    <div class="card rec" data-tip="Skill 生命周期推荐动作&#10;点击按钮可快速执行">
+      <div class="card-head">生命周期推荐动作</div>
+      <div class="rec-list">
+        <div class="rec-item" data-tip="3 个 30 天未使用 Skill：http_mock、doc_parser_v1、backup_helper"><span>🧹</span><div class="txt">清理 <b>3</b> 个 30 天未使用的 Skill</div><button class="btn">查看</button></div>
+        <div class="rec-item" data-tip="新版本可用：session_search v2.1、docker_helper v1.4"><span>🔄</span><div class="txt">升级 <b>2</b> 个 Skill 至最新版本</div><button class="btn primary">升级</button></div>
+        <div class="rec-item" data-tip="功能重叠：api_tester 与 http_client 存在 4 个相似零件"><span>⚠️</span><div class="txt">审查 <b>1</b> 组功能重叠的 Skill 对</div><button class="btn warn">对比</button></div>
+        <div class="rec-item" data-tip="新 Skill 已生成，可拆解为零件入库：auth_flow、schema_validator"><span>♻️</span><div class="txt">将 <b>2</b> 个新 Skill 拆解为零件入库</div><button class="btn primary">拆解</button></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="tooltip"></div>
+
+<div id="modalOverlay">
+  <div id="modal">
+    <button class="close">×</button>
+    <h3 id="mName">Skill 名称</h3>
+    <div class="meta" id="mMeta">category · status</div>
+    <div class="row"><span>单次 Token</span><strong id="mToken">-</strong></div>
+    <div class="row"><span>累计使用</span><strong id="mUsage">-</strong></div>
+    <div class="desc" id="mDesc">-</div>
+  </div>
+</div>
+
+<script>
+(function(){
+  const tooltip = document.getElementById('tooltip');
+  let hideTimer;
+
+  function showTip(text, x, y){
+    tooltip.innerHTML = text.replace(/\n/g,'<br>');
+    tooltip.classList.add('visible');
+    positionTip(x, y);
+  }
+  function positionTip(x, y){
+    const pad = 12;
+    let left = x + pad;
+    let top = y + pad;
+    const rect = tooltip.getBoundingClientRect();
+    if(left + rect.width > window.innerWidth) left = x - rect.width - pad;
+    if(top + rect.height > window.innerHeight) top = y - rect.height - pad;
+    tooltip.style.left = left + 'px';
+    tooltip.style.top = top + 'px';
+  }
+  function hideTip(){
+    tooltip.classList.remove('visible');
+  }
+
+  document.querySelectorAll('[data-tip]').forEach(el => {
+    el.addEventListener('mouseenter', (e) => {
+      clearTimeout(hideTimer);
+      showTip(el.dataset.tip, e.clientX, e.clientY);
+    });
+    el.addEventListener('mousemove', (e) => {
+      positionTip(e.clientX, e.clientY);
+    });
+    el.addEventListener('mouseleave', () => {
+      hideTimer = setTimeout(hideTip, 80);
+    });
+  });
+  tooltip.addEventListener('mouseenter', () => clearTimeout(hideTimer));
+  tooltip.addEventListener('mouseleave', hideTip);
+
+  const modalOverlay = document.getElementById('modalOverlay');
+  const mName = document.getElementById('mName');
+  const mMeta = document.getElementById('mMeta');
+  const mToken = document.getElementById('mToken');
+  const mUsage = document.getElementById('mUsage');
+  const mDesc = document.getElementById('mDesc');
+
+  document.querySelectorAll('.capsule').forEach(cap => {
+    cap.addEventListener('click', () => {
+      const data = JSON.parse(cap.dataset.skill);
+      mName.textContent = data.name;
+      mMeta.textContent = `${data.category} · ${data.status}`;
+      mToken.textContent = data.token;
+      mUsage.textContent = data.usage;
+      mDesc.textContent = data.desc;
+      modalOverlay.classList.add('active');
+    });
+  });
+
+  document.querySelector('#modal .close').addEventListener('click', () => modalOverlay.classList.remove('active'));
+  modalOverlay.addEventListener('click', (e) => {
+    if(e.target === modalOverlay) modalOverlay.classList.remove('active');
+  });
+})();
+</script>
+</body>
+</html>
