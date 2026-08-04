@@ -1670,8 +1670,8 @@ function renderSettings(c){
         '<div class="setting-head"><span class="setting-ico">🧰</span><span class="setting-title">开发环境</span></div>'+
         '<div class="setting-desc">当前工作空间与 Python 解释器路径，由扫描程序自动识别，仅作展示。</div>'+
         '<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">'+
-          '<div class="setting-row"><label>扫描根目录</label><input value="C:\\Users\\dillon\\.workbuddy" readonly></div>'+
-          '<div class="setting-row"><label>Python 路径</label><input value="C:/Users/dillon/.workbuddy/binaries/python/versions/3.13.12/python.exe" readonly></div>'+
+          '<div class="setting-row"><label>扫描根目录</label><input value="'+esc((DATA.env&&DATA.env.workbuddy_home)||'')+'" readonly></div>'+
+          '<div class="setting-row"><label>Python 路径</label><input value="'+esc((DATA.env&&DATA.env.python_path)||'')+'" readonly></div>'+
         '</div>'+
       '</div>'+
       '<div class="setting-card full">'+

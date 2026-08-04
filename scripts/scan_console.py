@@ -14,6 +14,8 @@ import shutil
 import argparse
 from datetime import datetime, timedelta
 from collections import defaultdict
+import glob
+import platform
 
 # ── 配置 ────────────────────────────────────────────
 WORKBUDDY_HOME = os.path.expanduser("~/.workbuddy")
@@ -507,6 +509,32 @@ def scan_workshop():
 
 # ── 主流程 ──────────────────────────────────────────
 
+def scan_env():
+    """探测运行环境：扫描根目录与 Python 解释器（跨平台，兼容 Windows / macOS / Linux / iOS 等类 Unix）。"""
+    home = os.path.expanduser("~/.workbuddy")
+    os_name = platform.system() or os.name
+    # 托管 Python：WorkBuddy 自带的隔离解释器
+    # Windows 为 python.exe；类 Unix（macOS/Linux/iOS-iSH/a-Shell）无 .exe 后缀
+    if os.name == "nt":
+        pat = os.path.join(home, "binaries", "python", "versions", "*", "python.exe")
+    else:
+        pat = os.path.join(home, "binaries", "python", "versions", "*", "python")
+    py = ""
+    matches = sorted(glob.glob(pat), reverse=True)
+    if matches:
+        py = matches[0]
+    if not py:                       # 回退：当前解释器
+        py = sys.executable or ""
+    if not py:                       # 回退：PATH 中的 python3 / python
+        py = shutil.which("python3") or shutil.which("python") or ""
+    # 展示统一用正斜杠，避免 Windows 反斜杠在 JSON/HTML 中被二次转义或复制到终端出错
+    return {
+        "workbuddy_home": home.replace(os.sep, "/"),
+        "python_path": py.replace(os.sep, "/") if py else "",
+        "os": os_name,
+    }
+
+
 def main():
     parser = argparse.ArgumentParser(description="WorkBuddy 控制台数据聚合")
     parser.add_argument('--output', '-o', default=None, help='输出 JSON 路径')
@@ -546,6 +574,10 @@ def main():
     # 重叠
     overlaps = analyze_overlaps(skills)
 
+    # 环境探测（跨平台）
+    env = scan_env()
+    print(f"  [env] 运行环境  →  {env['os']} | Python: {env['python_path'] or '(未找到)'}")
+
     # ── 组装输出 ──
     unused = [s for s in skills if s['status_color'] in ('warn', 'danger')]
     heavy = [s for s in skills if s['anomaly']]
@@ -571,6 +603,7 @@ def main():
         "storage": {"categories": cats, "summary": sumry},
         "conversations": convos,
         "overlaps": overlaps,
+        "env": env,
         "security": {
             "high_risk": [
                 {"name": s["display_name"], "id": s["id"],
