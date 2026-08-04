@@ -621,6 +621,22 @@ tbody tr:hover{background:var(--surface-2)}
 .dash-proto .capsule small{opacity:.7;font-weight:400;font-size:9px;margin-left:3px;font-family:var(--dp-display)}
 @keyframes capFloat{0%,100%{translate:0 0}50%{translate:0 -6px}}
 
+.dash-proto .dp-arena-card{position:absolute;left:50%;bottom:14px;transform:translateX(-50%);width:min(520px,88%);z-index:5;background:rgba(8,12,18,.88);border:1px solid rgba(34,211,238,.2);border-radius:16px;backdrop-filter:blur(14px);box-shadow:0 18px 50px rgba(0,0,0,.45),0 0 30px rgba(34,211,238,.06);display:flex;flex-direction:column;overflow:hidden}
+.dash-proto .dp-arena-card .head{display:flex;align-items:center;gap:8px;padding:10px 12px 6px;border-bottom:1px solid rgba(255,255,255,.06)}
+.dash-proto .dp-arena-card .head .chevron{width:18px;height:18px;border-radius:4px;background:rgba(34,211,238,.12);color:var(--cyan);display:grid;place-items:center;font-size:11px;cursor:pointer;transition:.2s}
+.dash-proto .dp-arena-card .head .chevron:hover{background:var(--cyan);color:#001015}
+.dash-proto .dp-arena-card .head .title{flex:1;font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dash-proto .dp-arena-card .head .bell{width:20px;height:20px;border-radius:50%;background:rgba(255,255,255,.05);display:grid;place-items:center;font-size:11px;color:var(--dim);cursor:pointer;transition:.2s}
+.dash-proto .dp-arena-card .head .bell:hover{background:rgba(34,211,238,.12);color:var(--cyan)}
+.dash-proto .dp-arena-card .body{padding:8px 12px 10px;font-size:11px;color:var(--dim);line-height:1.55;min-height:36px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.dash-proto .dp-arena-card .chatbar{display:flex;align-items:center;gap:6px;padding:8px 10px;border-top:1px solid rgba(255,255,255,.06);background:rgba(0,0,0,.2)}
+.dash-proto .dp-arena-card .chatbar .tool{width:22px;height:22px;border-radius:5px;display:grid;place-items:center;font-size:11px;color:var(--dim);background:rgba(255,255,255,.04);cursor:pointer;transition:.2s}
+.dash-proto .dp-arena-card .chatbar .tool:hover{background:rgba(34,211,238,.12);color:var(--cyan)}
+.dash-proto .dp-arena-card .chatbar .model{flex:1;display:flex;align-items:center;justify-content:center;gap:4px;font-size:10px;color:var(--dim);padding:3px 8px;border-radius:6px;background:rgba(255,255,255,.04);cursor:pointer;white-space:nowrap}
+.dash-proto .dp-arena-card .chatbar .model:hover{background:rgba(255,255,255,.08)}
+.dash-proto .dp-arena-card .chatbar .send{width:26px;height:26px;border-radius:6px;display:grid;place-items:center;background:var(--cyan);color:#001015;font-size:13px;cursor:pointer;transition:.2s;flex-shrink:0}
+.dash-proto .dp-arena-card .chatbar .send:hover{background:#4ff8ff;box-shadow:0 0 12px rgba(34,211,238,.5)}
+
 #dp-tooltip{position:fixed;z-index:1000;max-width:240px;padding:8px 10px;border-radius:8px;background:rgba(8,13,22,.95);border:1px solid rgba(34,211,238,.25);color:var(--text);font-size:11px;line-height:1.5;box-shadow:0 10px 30px rgba(0,0,0,.5);backdrop-filter:blur(8px);pointer-events:none;opacity:0;transition:opacity .15s;white-space:normal}
 #dp-tooltip.visible{opacity:1}
 #dp-tooltip b{display:block;font-weight:600;margin-bottom:2px;color:var(--cyan)}
@@ -877,13 +893,23 @@ function renderOverview(c){
   if(W.stats.generations) recs.push({ico:'♻️',txt:`查看 <b>${W.stats.generations}</b> 条生成记录与零件构成`,btn:'查看',cls:'primary',act:()=>switchTab('gens')});
   while(recs.length<4) recs.push({ico:'✨',txt:'运行 scan_console.py 刷新最新数据',btn:'刷新',act:()=>location.reload()});
 
+  const first=recs[0];
+  const recTitle=(first?first.txt.replace(/<[^>]+>/g,''):'当前状态良好');
+  const recBody=(first
+    ? (first.ico==='🧹' ? `检测到 ${cnt.warn+cnt.danger} 个 Skill 处于待清理状态，建议先备份再删除，可释放存储空间并降低管理成本。`
+       : first.ico==='🔄' ? `有 ${DATA.upgradableSkills.length} 个 Skill 存在可用更新，升级后可获得最新功能与问题修复。`
+       : first.ico==='⚠️' ? `发现 ${DATA.overlaps.length} 组 Skill 存在功能重叠，建议对比后合并或删除冗余项。`
+       : first.ico==='♻️' ? `已生成 ${W.stats.generations} 条 Skill 组装记录，可随时拆解为新零件入库。`
+       : '运行 scan_console.py 刷新最新数据，获得实时 Agent 健康洞察。')
+    : '当前所有指标正常，可以继续优化 Skill 结构或探索新组装。');
+
   c.innerHTML=`
     <div class="dash-proto">
       <div class="dp-topbar">
         <div class="dp-brand">
           <div class="dp-eyebrow">WorkBuddy · Agent Command Deck</div>
-          <h2>Agent 全景驾驶舱</h2>
-          <p>一屏查看全部：资产 · 健康 · 可执行建议</p>
+          <h2>Agent 全景驾驶舱 [v6]</h2>
+          <p>一屏查看全部：资产 · 健康 · 流水线 · 可执行建议</p>
         </div>
         <div class="dp-status"><span class="pulse"></span> Live</div>
       </div>
@@ -922,6 +948,20 @@ function renderOverview(c){
         <div class="dp-arena-wrap">
           <div class="dp-card dp-arena" id="arena">
             <img class="wb-avatar" src="assets/sprite_avatar.png" alt="WorkBuddy" onerror="this.style.display='none'">
+            <div class="dp-arena-card" data-tip="当前最推荐的下一步动作\n点击发送按钮可直接进入对话标签页">
+              <div class="head"><span class="chevron">▲</span><span class="title">${esc(recTitle)}</span><span class="bell">🔔</span></div>
+              <div class="body">${esc(recBody)}</div>
+              <div class="chatbar">
+                <span class="tool">📎</span>
+                <span class="tool">🖼️</span>
+                <span class="tool">🌐</span>
+                <span class="tool">⚡</span>
+                <span class="model">Kimi-K2.7-Code ▾</span>
+                <span class="tool">🎙️</span>
+                <span class="tool">🔊</span>
+                <span class="send" onclick="switchTab('chat')">➤</span>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -987,7 +1027,10 @@ function openDpModal(data){
   ov.classList.add('active');
 }
 function closeDpModal(){const ov=document.getElementById('dp-modal-overlay');if(ov)ov.classList.remove('active');}
-document.getElementById('dp-modal-overlay').addEventListener('click',e=>{if(e.target.id==='dp-modal-overlay')closeDpModal();});
+const _dpModalOverlay=document.getElementById('dp-modal-overlay');
+if(_dpModalOverlay){
+  _dpModalOverlay.addEventListener('click',e=>{if(e.target.id==='dp-modal-overlay')closeDpModal();});
+}
 
 function showSkillDetail(id){
   const s=DATA.skills.find(x=>x.id===id);if(!s)return;
@@ -1463,6 +1506,28 @@ function placeCapsules(mode='toast'){
   if(!skills.length)return;
   const aw=arenaEl.clientWidth||arenaEl.offsetWidth||800, ah=arenaEl.clientHeight||arenaEl.offsetHeight||480;
   if(aw<100||ah<100){requestAnimationFrame(()=>placeCapsules(mode));return;}
+
+  // 一屏大盘模式：固定 6 个胶囊位置，与原型图保持一致
+  if(arenaEl.classList.contains('dp-arena')){
+    const maxTok=Math.max(1,...skills.map(s=>s.token||0));
+    const top6=[...skills].sort((a,b)=>b.token-a.token).slice(0,6);
+    const slots=[
+      {t:'11%',l:'12%',c:'var(--cyan)'},{t:'24%',l:'93%',c:'var(--purple)'},{t:'44%',l:'5%',c:'var(--green)'},
+      {t:'58%',l:'95%',c:'var(--amber)'},{t:'78%',l:'12%',c:'var(--blue)'},{t:'85%',l:'90%',c:'var(--red)'}
+    ];
+    top6.forEach((s,i)=>{
+      const slot=slots[i%slots.length];
+      const el=document.createElement('div');
+      el.className='capsule';
+      el.style.top=slot.t;el.style.left=slot.l;
+      el.style.borderColor=slot.c;el.style.color=slot.c;
+      el.innerHTML=esc(s.display_name)+' <small>'+((s.token||0)/1000).toFixed(1)+'k</small>';
+      el.onclick=(e)=>{if(mode==='detail')showSkillDetail(s.id);else toast('Skill：'+s.display_name+'（见「Skill 管理」）');};
+      arenaEl.appendChild(el);
+    });
+    return;
+  }
+
   const maxTok=Math.max(1,...skills.map(s=>s.token||0));
   const n=skills.length;
   const indexed=skills.map((s,i)=>({i,heat:Math.min(1,(s.token||0)/maxTok)})).sort((a,b)=>b.heat-a.heat);

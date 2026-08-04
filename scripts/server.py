@@ -125,6 +125,9 @@ class APIHandler(BaseHTTPRequestHandler):
         self.send_response(200)
         self.send_header("Content-Type", content_type)
         self.send_header("Content-Length", str(len(data)))
+        self.send_header("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0")
+        self.send_header("Pragma", "no-cache")
+        self.send_header("Expires", "0")
         self.end_headers()
         self.wfile.write(data)
 
@@ -801,8 +804,8 @@ def summarize_text(text, llm):
 
 
 def run(port=8080):
-    print(f"WorkBuddy Console Server: http://127.0.0.1:{port}")
-    HTTPServer(("127.0.0.1", port), APIHandler).serve_forever()
+    print(f"WorkBuddy Console Server: http://0.0.0.0:{port}")
+    HTTPServer(("0.0.0.0", port), APIHandler).serve_forever()
 
 
 if __name__ == "__main__":
