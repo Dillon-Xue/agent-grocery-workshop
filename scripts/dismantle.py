@@ -34,6 +34,10 @@ def parse_skill_to_candidates(skill_md_path: str) -> list:
     with open(skill_md_path, "r", encoding="utf-8") as f:
         text = f.read()
 
+    # 容错：某些 SKILL.md 被错误地写入了转义后的 \n 字面量，先还原成真实换行
+    if "\\n" in text and "\n" not in text.replace("\\n", ""):
+        text = text.replace("\\n", "\n")
+
     fm = {}
     m = re.match(r"^---\s*\n(.*?)\n---", text, re.S)
     if m:

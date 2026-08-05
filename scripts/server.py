@@ -19,6 +19,7 @@ from urllib.parse import parse_qs, urlparse
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from workshop import Workshop
+from dismantle import parse_skill_to_candidates
 
 # ── 配置 ──
 WORKBUDDY_ROOT = Path.home() / ".workbuddy"
@@ -178,8 +179,12 @@ class APIHandler(BaseHTTPRequestHandler):
             return self.handle_skill_generate(payload)
         if path == "/api/skill/generate-status":
             return self.handle_skill_generate_status(payload)
+        if path == "/api/skill/generations":
+            return self.handle_skill_generations(payload)
         if path == "/api/skill/install":
             return self.handle_skill_install(payload)
+        if path == "/api/skill/dismantle":
+            return self.handle_skill_dismantle(payload)
         return self._error("Unsupported POST endpoint", 404)
 
     def handle_search(self, payload):
@@ -744,6 +749,10 @@ class APIHandler(BaseHTTPRequestHandler):
                 'candidates_count': len(candidates),
                 'skipped_count': len(skipped),
                 'notes': notes,
+                'progress': list(_generation_jobs[job_id].get('progress', [])),
+                'path': str(Path(gdir) / 'SKILL.md'),
+                'status': 'done',
+                'auto_dismantled': False,
             }
             gdir = ws.record_generation(gen, content)
             update(
@@ -781,6 +790,20 @@ class APIHandler(BaseHTTPRequestHandler):
                 'error': job['error'],
             },
         })
+
+    def handle_skill_generations(self, payload):
+        """返回磁盘上所有已落盘的生成记录。
+
+        前端进入「Skill开发」tab 或刷新页面时调用，保证除内存快照（EMBEDDED_DATA /
+        console_data.json）之外，也能从 generations/ 目录读取真实历史记录，避免刷新后
+        新生成的 Skill 记录「消失」。
+        """
+        try:
+            ws = Workshop(str(BASE_DIR))
+            gens = ws.load_generations()
+        except Exception as e:
+            return self._error('读取生成记录失败：' + str(e))
+        return self._json({'ok': True, 'generations': gens})
 
     @staticmethod
     def _part_selection_reason(part, requirements):
@@ -886,6 +909,33 @@ class APIHandler(BaseHTTPRequestHandler):
             return self._json({'ok': True, 'path': str(dest), 'name': target_name})
         except Exception as e:
             return self._error(str(e))
+
+    def handle_skill_dismantle(self, payload):
+        """对 generations/<id>/SKILL.md 执行拆解，返回候选零件并落盘。"""
+        gid = (payload.get('id') or '').strip()
+        if not gid:
+            return self._error('缺少生成记录 id')
+        gdir = BASE_DIR / 'generations' / gid
+        skill_md = gdir / 'SKILL.md'
+        manifest = gdir / 'manifest.json'
+        if not skill_md.exists():
+            return self._error('未找到生成记录：{0}'.format(gid))
+        try:
+            candidates = parse_skill_to_candidates(str(skill_md))
+            now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            manifest_obj = {}
+            if manifest.exists():
+                try:
+                    manifest_obj = json.loads(manifest.read_text(encoding='utf-8'))
+                except Exception:
+                    manifest_obj = {}
+            manifest_obj['auto_dismantled'] = True
+            manifest_obj['dismantled_at'] = now
+            manifest_obj['dismantle_candidates'] = candidates
+            manifest.write_text(json.dumps(manifest_obj, ensure_ascii=False, indent=2), encoding='utf-8')
+            return self._json({'ok': True, 'id': gid, 'candidates': candidates, 'count': len(candidates)})
+        except Exception as e:
+            return self._error('拆解失败：{0}'.format(e))
 
 # ── 回收站 / 安全工具（模块级）──
 CONVERSATIONS_DIR = WORKBUDDY_ROOT / "projects"
