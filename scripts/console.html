@@ -730,6 +730,20 @@ mark.sr-hl{background:rgba(250,204,21,.35);color:inherit;border-radius:3px;paddi
 .md-code{background:#0d1117;color:#c9d1d9;border-radius:8px;padding:12px;overflow:auto;font-family:ui-monospace,monospace;font-size:12.5px;margin:8px 0}
 .md-icode{background:var(--surface-2);border:1px solid var(--line);border-radius:4px;padding:1px 5px;font-family:ui-monospace,monospace;font-size:.92em}
 .md-sp{height:6px}
+/* ── 新建 Skill 模态框 ── */
+.gen-modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.65);backdrop-filter:blur(4px);display:none;align-items:center;justify-content:center;padding:20px;z-index:70}
+.gen-modal-overlay.show{display:flex}
+.gen-modal{background:var(--surface);border:1px solid var(--border);border-radius:16px;width:min(920px,92vw);max-height:calc(100vh - 40px);overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.5);display:flex;flex-direction:column}
+.gen-modal-head{display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid var(--line)}
+.gen-modal-head h3{font-size:16px;font-weight:650;margin:0}
+.gen-modal-head .close{width:30px;height:30px;border-radius:8px;border:1px solid var(--line);background:var(--surface-2);color:var(--text);font-size:18px;line-height:1;cursor:pointer;transition:.15s}
+.gen-modal-head .close:hover{border-color:var(--cyan);color:var(--cyan)}
+.gen-modal-body{flex:1;overflow-y:auto;padding:20px}
+.gen-modal-body .gen-grid{grid-template-columns:1fr 1fr}
+@media(max-width:900px){
+  .gen-modal-body .gen-grid{grid-template-columns:1fr}
+  .gen-modal{width:min(640px,94vw)}
+}
 </style>
 </head>
 <body>
@@ -747,10 +761,9 @@ mark.sr-hl{background:rgba(250,204,21,.35);color:inherit;border-radius:3px;paddi
       <div class="nav-item" data-tab="skills"><span class="ico">🧩</span><span class="txt">Skill 管理</span><span class="badge" id="b-skills"></span></div>
       <div class="nav-item" data-tab="storage"><span class="ico">💾</span><span class="txt">存储空间</span><span class="badge" id="b-storage"></span></div>
       <div class="nav-label">Skill工坊</div>
-      <div class="nav-item" data-tab="shelf"><span class="ico">📦</span><span class="txt">模板库</span><span class="badge" id="b-shelf"></span></div>
-      <div class="nav-item" data-tab="gens"><span class="ico">📜</span><span class="txt">Skill生成记录</span><span class="badge" id="b-gens"></span></div>
-      <div class="nav-item" data-tab="gen"><span class="ico">🧪</span><span class="txt">生成Skill</span></div>
+      <div class="nav-item" data-tab="skilldev"><span class="ico">🧪</span><span class="txt">Skill开发</span><span class="badge" id="b-skilldev"></span></div>
       <div class="nav-item" data-tab="dismantle"><span class="ico">🛠️</span><span class="txt">任务拆解</span><span class="badge" id="b-dismantle"></span></div>
+      <div class="nav-item" data-tab="shelf"><span class="ico">📦</span><span class="txt">模板管理</span><span class="badge" id="b-shelf"></span></div>
       <div class="nav-label">Agent</div>
       <div class="nav-item" data-tab="chat"><span class="ico">💬</span><span class="txt">对话</span><span class="badge" id="b-chat"></span></div>
       <div class="nav-item" data-tab="tasks"><span class="ico">📋</span><span class="txt">任务</span><span class="badge" id="b-tasks"></span></div>
@@ -787,15 +800,25 @@ mark.sr-hl{background:rgba(250,204,21,.35);color:inherit;border-radius:3px;paddi
   </div>
 </div>
 
+<!-- ── 新建 Skill 模态框（独立于 tab content，切页不销毁）── -->
+<div class="gen-modal-overlay" id="genModalOverlay">
+  <div class="gen-modal">
+    <div class="gen-modal-head">
+      <h3>🧪 新建 Skill</h3>
+      <button class="close" onclick="closeGenModal()" aria-label="关闭">×</button>
+    </div>
+    <div class="gen-modal-body" id="genModalBody"></div>
+  </div>
+</div>
+
 <script>
 const TAB_META = {
   overview:  {title:'概览',        sub:'Agent 资产全景 · Skill 体量可视化 · 一键洞察'},
   skills:    {title:'Skill 管理',  sub:'已装 Skill 健康度 · 升级 · 删除 · 使用频率'},
   storage:   {title:'存储空间',    sub:'日志 / 会话 / 缓存 占用明细与清理建议'},
-  shelf:     {title:'模板库',      sub:'模板货架 · Skill 体量解剖 · 双视图翻页'},
-  gens:      {title:'Skill生成记录', sub:'Skill 自动组装的产出与选用零件'},
-  gen:       {title:'生成 Skill',  sub:'描述需求，自动拼装零件并生成可安装的 Skill'},
+  skilldev:  {title:'Skill开发',   sub:'Skill 生成记录 · 新建并自动生成可安装的 Skill'},
   dismantle: {title:'任务拆解',    sub:'Skill 自动拆解回填进度'},
+  shelf:     {title:'模板管理',    sub:'模板货架 · Skill 体量解剖 · 双视图翻页'},
   chat:      {title:'对话',        sub:'与 Skill 对话 · 查看并检索 WorkBuddy 历史会话'},
   tasks:     {title:'任务',        sub:'自动化任务列表与运行状态'},
   anomalies: {title:'异常日志',    sub:'运行异常与错误采样'},
@@ -977,7 +1000,7 @@ function switchTab(tab){
   document.querySelector('.main').style.overflowY=tab==='overview'?'hidden':'auto';
   closeSkillFloat();
   ({overview:renderOverview,skills:renderSkills,storage:renderStorage,
-    shelf:renderShelf,gens:renderGens,gen:renderGen,dismantle:renderDismantle,
+    skilldev:renderSkillDev,dismantle:renderDismantle,shelf:renderShelf,
     chat:renderChat,tasks:renderTasks,anomalies:renderAnomalies,settings:renderSettings}[tab])(c);
 }
 
@@ -1035,7 +1058,7 @@ function renderOverview(c){
   if(cnt.warn+cnt.danger) recs.push({ico:'🧹',txt:`清理 <b>${cnt.warn+cnt.danger}</b> 个待清理 Skill`,btn:'查看',act:()=>{skFilter='danger';switchTab('skills');}});
   if((DATA.upgradableSkills||[]).length) recs.push({ico:'🔄',txt:`升级 <b>${DATA.upgradableSkills.length}</b> 个 Skill 至最新版本`,btn:'升级',cls:'primary',act:()=>switchTab('skills')});
   if((DATA.overlaps||[]).length) recs.push({ico:'⚠️',txt:`审查 <b>${DATA.overlaps.length}</b> 组功能重叠的 Skill 对`,btn:'对比',cls:'warn',act:()=>switchTab('skills')});
-  if(W.stats.generations) recs.push({ico:'♻️',txt:`查看 <b>${W.stats.generations}</b> 条生成记录与零件构成`,btn:'查看',cls:'primary',act:()=>switchTab('gens')});
+  if(W.stats.generations) recs.push({ico:'♻️',txt:`查看 <b>${W.stats.generations}</b> 条生成记录与零件构成`,btn:'查看',cls:'primary',act:()=>switchTab('skilldev')});
   while(recs.length<4) recs.push({ico:'✨',txt:'运行 scan_console.py 刷新最新数据',btn:'刷新',act:()=>location.reload()});
 
   c.innerHTML=`
@@ -1812,9 +1835,10 @@ window.addEventListener('resize',()=>{
 });
 
 // ── Skill生成记录 ──
-function renderGens(c){
+function renderSkillDev(c){
   const W=DATA.workshop, gens=W.generations||[];
-  if(!gens.length){c.innerHTML='<div class="empty"><div class="e-ico">📜</div>暂无生成记录<br><span style="font-size:11px">Skill 自动组装产出会出现在这里</span></div>';return;}
+  const head='<div class="sec-head" style="justify-content:space-between"><div style="display:flex;align-items:center;gap:10px"><h2>🧪 Skill开发</h2><span class="tag">'+gens.length+' 条生成记录</span></div><button class="btn primary" id="btnNewSkill">+ 新建 Skill</button></div>';
+  if(!gens.length){c.innerHTML=head+'<div class="empty"><div class="e-ico">📜</div>暂无生成记录<br><span style="font-size:11px">点击右上角「新建 Skill」开始自动生成</span></div>';bindNewSkill();return;}
   let html='';
   gens.forEach(g=>{
     const color=g.auto_dismantled?'var(--green)':'var(--cyan)';
@@ -1829,9 +1853,14 @@ function renderGens(c){
       (parts?'<div class="gen-basis"><div class="gen-basis-title">📋 选用清单</div><div class="gen-basis-row">'+parts+'</div></div>':'')+
       '</div></div>';
   });
-  c.innerHTML='<div class="sec-head"><h2>📜 Skill生成记录</h2><span class="tag">'+gens.length+' 条</span></div>'+html;
+  c.innerHTML=head+html;
   c.querySelectorAll('.gen-head').forEach(h=>h.onclick=()=>h.parentElement.classList.toggle('open'));
   c.querySelectorAll('.gen-basis [data-id]').forEach(a=>a.onclick=e=>{e.stopPropagation();const p=W.parts_by_id[a.dataset.id];if(p)toast(p.name+' · '+esc(p.type||''));});
+  bindNewSkill();
+}
+function bindNewSkill(){
+  const btn=document.getElementById('btnNewSkill');
+  if(btn)btn.onclick=()=>openGenModal();
 }
 
 // ── 拆解任务 ──
@@ -2101,28 +2130,46 @@ function renderAnomalies(c){
 }
 
 // ── 设置 ──
+// ── 生成 Skill 表单（可渲染到任意容器，支持 localStorage 草稿）──
+const GEN_DRAFT_KEY='wb_gen_draft_v1';
+function loadGenDraft(){try{return JSON.parse(localStorage.getItem(GEN_DRAFT_KEY)||'{}');}catch(e){return {};}}
+function clearGenDraft(){localStorage.removeItem(GEN_DRAFT_KEY);}
+let genDraftTimer=null;
+function scheduleGenDraftSave(fn){clearTimeout(genDraftTimer);genDraftTimer=setTimeout(fn,300);}
+
+function openGenModal(){
+  const ov=document.getElementById('genModalOverlay');
+  if(!ov)return;
+  renderGen(document.getElementById('genModalBody'));
+  ov.classList.add('show');
+}
+function closeGenModal(){
+  const ov=document.getElementById('genModalOverlay');
+  if(ov)ov.classList.remove('show');
+}
+document.addEventListener('click',e=>{const ov=document.getElementById('genModalOverlay');if(ov&&e.target===ov)closeGenModal();});
+
 function renderGen(c){
-  c.innerHTML='<div class="sec-head"><h2>🧪 生成 Skill</h2><p class="sec-sub">描述你的需求，控制台会自动检索零件库、拼装并生成一份可安装的 Skill。</p></div>'+
-    '<div class="gen-grid">'+
-      '<div class="gen-card">'+
-        '<div class="gen-head">① 描述需求</div>'+
-        '<div class="gen-row"><label>Skill 名称</label><input id="genName" placeholder="例如：pdf 表格提取助手"></div>'+
-        '<div class="gen-row"><label>功能描述</label><textarea id="genDesc" rows="5" placeholder="这个 Skill 要做什么？支持哪些输入？产出什么？"></textarea></div>'+
-        '<div class="gen-row"><label>标签（可选，逗号分隔）</label><input id="genTags" placeholder="pdf, 表格, 提取"></div>'+
-        '<div class="gen-actions">'+
-          '<button class="btn" id="genPlan">预览零件选用</button>'+
-          '<button class="btn primary" id="genDo" disabled>生成 Skill</button>'+
-        '</div>'+
+  c.innerHTML='<div class="gen-grid">'+
+    '<div class="gen-card">'+
+      '<div class="gen-head">① 描述需求</div>'+
+      '<div class="gen-row"><label>Skill 名称</label><input id="genName" placeholder="例如：pdf 表格提取助手"></div>'+
+      '<div class="gen-row"><label>功能描述</label><textarea id="genDesc" rows="5" placeholder="这个 Skill 要做什么？支持哪些输入？产出什么？"></textarea></div>'+
+      '<div class="gen-row"><label>标签（可选，逗号分隔）</label><input id="genTags" placeholder="pdf, 表格, 提取"></div>'+
+      '<div class="gen-actions">'+
+        '<button class="btn" id="genPlan">预览零件选用</button>'+
+        '<button class="btn primary" id="genDo" disabled>生成 Skill</button>'+
       '</div>'+
-      '<div class="gen-card">'+
-        '<div class="gen-head">② 拼装与产物</div>'+
-        '<div id="genPlanBox" class="gen-plan"><div class="gen-empty">点击「预览零件选用」查看自动匹配的零件。</div></div>'+
-        '<div id="genResult" class="gen-result" style="display:none">'+
-          '<div class="gen-result-head"><span id="genResultPath" class="gen-path"></span><button class="btn primary" id="genInstall" style="margin-left:auto">安装到 WorkBuddy</button></div>'+
-          '<pre class="gen-skillmd"><code id="genSkillMd"></code></pre>'+
-        '</div>'+
+    '</div>'+
+    '<div class="gen-card">'+
+      '<div class="gen-head">② 拼装与产物</div>'+
+      '<div id="genPlanBox" class="gen-plan"><div class="gen-empty">点击「预览零件选用」查看自动匹配的零件。</div></div>'+
+      '<div id="genResult" class="gen-result" style="display:none">'+
+        '<div class="gen-result-head"><span id="genResultPath" class="gen-path"></span><button class="btn primary" id="genInstall" style="margin-left:auto">安装到 WorkBuddy</button></div>'+
+        '<pre class="gen-skillmd"><code id="genSkillMd"></code></pre>'+
       '</div>'+
-    '</div>';
+    '</div>'+
+  '</div>';
 
   const nameEl=document.getElementById('genName');
   const descEl=document.getElementById('genDesc');
@@ -2135,6 +2182,15 @@ function renderGen(c){
   const pathEl=document.getElementById('genResultPath');
   const installBtn=document.getElementById('genInstall');
   let lastPlan=null;
+
+  // 恢复草稿
+  const draft=loadGenDraft();
+  if(draft.name!==undefined)nameEl.value=draft.name;
+  if(draft.desc!==undefined)descEl.value=draft.desc;
+  if(draft.tags!==undefined)tagsEl.value=draft.tags;
+
+  const saveDraft=()=>{localStorage.setItem(GEN_DRAFT_KEY,JSON.stringify({name:nameEl.value,desc:descEl.value,tags:tagsEl.value,ts:Date.now()}));};
+  [nameEl,descEl,tagsEl].forEach(el=>{el.addEventListener('input',()=>scheduleGenDraftSave(saveDraft));});
 
   const gatherReq=()=>{
     const name=(nameEl.value||'').trim();
@@ -2175,7 +2231,10 @@ function renderGen(c){
       pathEl.textContent=d.path||'';
       resultBox.style.display='block';
       installBtn.dataset.id=d.id||'';
+      clearGenDraft();
       toast('Skill 已生成：'+(d.path||''));
+      // 若当前在 Skill开发页，刷新列表
+      if(currentTab==='skilldev')renderSkillDev(document.getElementById('content'));
     }).catch(e=>{doBtn.disabled=false;doBtn.textContent='生成 Skill';toast('生成请求失败：'+apiErrorHint(e));});
   };
 
