@@ -8,8 +8,10 @@ import re
 import shutil
 import subprocess
 import sys
+import threading
 import urllib.error
 import urllib.request
+import uuid
 from datetime import datetime
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
@@ -24,6 +26,10 @@ SKILLS_DIR = WORKBUDDY_ROOT / "skills"
 BASE_DIR = Path(__file__).resolve().parent.parent
 CONFIG_FILE = BASE_DIR / "console_config.json"
 BACKUP_DIR = WORKBUDDY_ROOT / "console-backups"
+
+# 异步 Skill 生成任务（内存态，重启后丢失；产物已落盘）
+_generation_jobs = {}
+_generation_jobs_lock = threading.Lock()
 
 # WorkBuddy 主程序路径（用于「在 WorkBuddy 打开」）
 WORKBUDDY_EXE_CANDIDATES = [
@@ -170,6 +176,8 @@ class APIHandler(BaseHTTPRequestHandler):
             return self.handle_skill_generate_plan(payload)
         if path == "/api/skill/generate":
             return self.handle_skill_generate(payload)
+        if path == "/api/skill/generate-status":
+            return self.handle_skill_generate_status(payload)
         if path == "/api/skill/install":
             return self.handle_skill_install(payload)
         return self._error("Unsupported POST endpoint", 404)
@@ -660,30 +668,82 @@ class APIHandler(BaseHTTPRequestHandler):
         description = (requirements.get('description') or '').strip()
         if not name or not description:
             return self._error('请提供 Skill 名称与功能描述')
+        job_id = 'gen_' + uuid.uuid4().hex[:12]
+        with _generation_jobs_lock:
+            _generation_jobs[job_id] = {
+                'id': job_id,
+                'status': 'pending',
+                'progress': ['已加入生成队列'],
+                'created_at': datetime.now().isoformat(timespec='seconds'),
+                'requirements': requirements,
+                'result': None,
+                'error': None,
+            }
+        threading.Thread(
+            target=self._run_generation_job,
+            args=(job_id, requirements),
+            daemon=True,
+        ).start()
+        return self._json({'ok': True, 'job_id': job_id})
+
+    def _run_generation_job(self, job_id, requirements):
+        def update(**kwargs):
+            with _generation_jobs_lock:
+                _generation_jobs[job_id].update(kwargs)
+
         try:
+            update(status='running')
             ws = Workshop(str(BASE_DIR))
+            update(progress=['检索零件库中…'])
             result = ws.assemble(requirements)
             selected = result.get('selected', [])
+            update(progress=['已匹配 {0} 个零件，正在生成 SKILL.md…'.format(len(selected))])
             content = self._generate_skill_content(requirements, selected)
-            gid = re.sub(r'[\\s/\\\\:*?"<>|]+', '_', name).lower() or 'gen'
+            name = requirements.get('name', '未命名 Skill')
+            gid = re.sub(r'[\s/\:*?"<>|]+', '_', name).lower() or 'gen'
             gen = {
                 'id': gid,
                 'name': name,
-                'description': description,
+                'description': requirements.get('description', ''),
                 'tags': requirements.get('tags', []),
                 'created_at': datetime.now().isoformat(timespec='seconds'),
                 'selected_part_ids': [p.get('id') for p in selected],
+                'used_part_ids': [p.get('id') for p in selected],
                 'notes': result.get('notes', ''),
             }
             gdir = ws.record_generation(gen, content)
-            return self._json({
-                'ok': True,
-                'id': gid,
-                'path': str(Path(gdir) / 'SKILL.md'),
-                'content': content,
-            })
+            update(
+                status='done',
+                progress=['生成完成：' + str(Path(gdir) / 'SKILL.md')],
+                result={
+                    'id': gid,
+                    'path': str(Path(gdir) / 'SKILL.md'),
+                    'content': content,
+                    'generation': gen,
+                },
+            )
         except Exception as e:
-            return self._error(str(e))
+            update(status='error', error=str(e), progress=['生成失败：' + str(e)])
+
+    def handle_skill_generate_status(self, payload):
+        job_id = (payload.get('job_id') or '').strip()
+        if not job_id:
+            return self._error('缺少 job_id')
+        with _generation_jobs_lock:
+            job = _generation_jobs.get(job_id)
+        if not job:
+            return self._error('未找到生成任务：' + job_id)
+        return self._json({
+            'ok': True,
+            'job': {
+                'id': job['id'],
+                'status': job['status'],
+                'progress': job['progress'],
+                'created_at': job['created_at'],
+                'result': job['result'],
+                'error': job['error'],
+            },
+        })
 
     def _generate_skill_content(self, requirements, selected_parts):
         llm = CONFIG.get('llm', {})

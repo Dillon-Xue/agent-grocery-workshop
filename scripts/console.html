@@ -404,6 +404,9 @@ tbody tr:hover{background:var(--surface-2)}
 .gen-meta{margin-left:auto;display:flex;gap:12px;font-size:11px;color:var(--dim);font-family:var(--mono)}
 .gen-body{margin-top:12px;display:none}
 .gen-card.open .gen-body{display:block}
+.gen-status{font-size:11px;font-weight:600;padding:2px 8px;border-radius:999px;background:rgba(255,255,255,.08);margin-left:6px}
+.gen-progress{margin-bottom:12px;padding:10px 12px;background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.25);border-radius:9px}
+.gen-pg-line{font-size:12px;color:var(--dim);line-height:1.7}
 .gen-timeline{display:flex;flex-direction:column;gap:7px;font-size:12.5px;color:var(--dim)}
 .gen-basis{margin-top:12px;padding-top:12px;border-top:1px solid var(--border)}
 .gen-basis-title{font-size:11px;color:var(--dim);margin-bottom:8px}
@@ -696,26 +699,26 @@ mark{background:#fde047;color:#1a1a1a;border-radius:3px;padding:0 2px;font-weigh
 .gen-result textarea{width:100%;height:320px;background:#0a0e14;border:1px solid var(--border);border-radius:10px;color:#d6e2ff;font-family:ui-monospace,monospace;font-size:12px;padding:12px;box-sizing:border-box;white-space:pre;line-height:1.55}
 .gen-result .gen-ok{color:#34d399;font-size:13px;margin:10px 0}
 .gen-install-path{font-size:12px;color:var(--faint);margin-top:8px;word-break:break-all}
-/* ── 生成 Skill ── */
-.gen-grid{display:grid;grid-template-columns:1fr 1fr;gap:20px;align-items:start}
-.gen-card{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:18px}
-.gen-head{font-weight:600;margin-bottom:14px;color:var(--text);font-size:15px}
-.gen-row{margin-bottom:12px;display:flex;flex-direction:column;gap:6px}
-.gen-row label{font-size:12px;color:var(--dim)}
-.gen-row input,.gen-row textarea{background:var(--surface-2);border:1px solid var(--line);color:var(--text);border-radius:8px;padding:9px 11px;font:inherit;resize:vertical}
-.gen-actions{display:flex;gap:10px;margin-top:6px}
-.gen-plan{margin-top:6px}
-.gen-empty{color:var(--dim);font-size:13px;padding:10px 0}
-.gen-err{color:var(--red)}
-.gen-notes{background:var(--surface-2);border-left:3px solid var(--accent,#4b9cff);padding:10px 12px;border-radius:8px;font-size:13px;color:var(--text);white-space:pre-wrap;margin-bottom:12px}
-.gen-parts{display:flex;flex-direction:column;gap:8px}
-.gen-part{background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:9px 11px}
-.gp-name{display:block;font-weight:600;font-size:13px;color:var(--text)}
-.gp-desc{display:block;font-size:12px;color:var(--dim);margin-top:3px}
-.gen-result{margin-top:14px}
-.gen-result-head{display:flex;align-items:center;gap:10px;margin-bottom:8px}
-.gen-path{font-size:12px;color:var(--dim);font-family:ui-monospace,monospace;word-break:break-all}
-.gen-skillmd{max-height:420px;overflow:auto;background:#0d1117;border:1px solid var(--line);border-radius:10px;padding:14px;font-family:ui-monospace,Menlo,monospace;font-size:12.5px;line-height:1.6;color:#c9d1d9;white-space:pre-wrap;margin:0}
+/* ── 生成 Skill 表单（仅模态框内，避免污染列表）── */
+#genModalOverlay .gen-grid{display:grid;grid-template-columns:1fr 1fr;gap:20px;align-items:start}
+#genModalOverlay .gen-card{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:18px}
+#genModalOverlay .gen-head{font-weight:600;margin-bottom:14px;color:var(--text);font-size:15px}
+#genModalOverlay .gen-row{margin-bottom:12px;display:flex;flex-direction:column;gap:6px}
+#genModalOverlay .gen-row label{font-size:12px;color:var(--dim)}
+#genModalOverlay .gen-row input,#genModalOverlay .gen-row textarea{background:var(--surface-2);border:1px solid var(--line);color:var(--text);border-radius:8px;padding:9px 11px;font:inherit;resize:vertical}
+#genModalOverlay .gen-actions{display:flex;gap:10px;margin-top:6px}
+#genModalOverlay .gen-plan{margin-top:6px}
+#genModalOverlay .gen-empty{color:var(--dim);font-size:13px;padding:10px 0}
+#genModalOverlay .gen-err{color:var(--red)}
+#genModalOverlay .gen-notes{background:var(--surface-2);border-left:3px solid var(--accent,#4b9cff);padding:10px 12px;border-radius:8px;font-size:13px;color:var(--text);white-space:pre-wrap;margin-bottom:12px}
+#genModalOverlay .gen-parts{display:flex;flex-direction:column;gap:8px}
+#genModalOverlay .gen-part{background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:9px 11px}
+#genModalOverlay .gp-name{display:block;font-weight:600;font-size:13px;color:var(--text)}
+#genModalOverlay .gp-desc{display:block;font-size:12px;color:var(--dim);margin-top:3px}
+#genModalOverlay .gen-result{margin-top:14px}
+#genModalOverlay .gen-result-head{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+#genModalOverlay .gen-path{font-size:12px;color:var(--dim);font-family:ui-monospace,monospace;word-break:break-all}
+#genModalOverlay .gen-skillmd{max-height:420px;overflow:auto;background:#0d1117;border:1px solid var(--line);border-radius:10px;padding:14px;font-family:ui-monospace,Menlo,monospace;font-size:12.5px;line-height:1.6;color:#c9d1d9;white-space:pre-wrap;margin:0}
 /* ── 搜索命中高亮 ── */
 mark.sr-hl{background:rgba(250,204,21,.35);color:inherit;border-radius:3px;padding:0 1px}
 .hl-count{color:#facc15;font-weight:600}
@@ -1835,32 +1838,91 @@ window.addEventListener('resize',()=>{
 });
 
 // ── Skill生成记录 ──
+// 内存中的生成任务（切 tab 不丢，刷新丢失；产物已落盘可重载）
+let runningGenerations=[];
 function renderSkillDev(c){
-  const W=DATA.workshop, gens=W.generations||[];
-  const head='<div class="sec-head" style="justify-content:space-between"><div style="display:flex;align-items:center;gap:10px"><h2>🧪 Skill开发</h2><span class="tag">'+gens.length+' 条生成记录</span></div><button class="btn primary" id="btnNewSkill">+ 新建 Skill</button></div>';
-  if(!gens.length){c.innerHTML=head+'<div class="empty"><div class="e-ico">📜</div>暂无生成记录<br><span style="font-size:11px">点击右上角「新建 Skill」开始自动生成</span></div>';bindNewSkill();return;}
+  const W=DATA.workshop, savedGens=W.generations||[];
+  const head='<div class="sec-head" style="justify-content:space-between"><h2>🧪 Skill开发</h2><button class="btn primary" id="btnNewSkill">新建 Skill</button></div>';
+
+  // 合并已落盘记录与运行中任务：运行中放最前
+  const running=runningGenerations.map(r=>({...r, _running:true}));
+  const all=[...running, ...savedGens];
+
+  if(!all.length){c.innerHTML=head+'<div class="empty"><div class="e-ico">📜</div>暂无生成记录<br><span style="font-size:11px">点击右上角「新建 Skill」开始自动生成</span></div>';bindNewSkill();return;}
   let html='';
-  gens.forEach(g=>{
-    const color=g.auto_dismantled?'var(--green)':'var(--cyan)';
-    const parts=(g.used_part_ids||[]).map(id=>{const p=W.parts_by_id[id];return p?'<a data-id="'+id+'">'+esc(p.name)+'</a>':esc(id);}).join(' · ');
-    html+='<div class="gen-card"><div class="gen-head"><div class="gen-dot" style="background:'+color+'"></div>'+
-      '<h3>'+esc(g.name)+'</h3><div class="gen-meta"><span>'+esc(g.created_at||'')+'</span><span>'+(g.used_part_ids?g.used_part_ids.length:0)+' 个零件</span></div></div>'+
-      '<div class="gen-body"><div class="gen-timeline">'+
-      '<div class="gen-tl-item">📝 需求提出：'+esc(g.initial_query||g.name)+'</div>'+
-      '<div class="gen-tl-item">🔍 零件检索：命中 '+(g.used_part_ids?g.used_part_ids.length:0)+' 个</div>'+
-      '<div class="gen-tl-item">🔧 组装确认：'+esc(g.created_at||'')+'</div>'+
-      (g.auto_dismantled?'<div class="gen-tl-item">♻️ 自动拆解回填</div>':'')+'</div>'+
-      (parts?'<div class="gen-basis"><div class="gen-basis-title">📋 选用清单</div><div class="gen-basis-row">'+parts+'</div></div>':'')+
+  all.forEach(g=>{
+    const isRun=!!g._running;
+    const status=g.status;
+    let color,statusLabel;
+    if(isRun){
+      if(status==='error'){color='var(--red)';statusLabel='生成失败';}
+      else{color='var(--amber)';statusLabel='生成中';}
+    }else{
+      color=g.auto_dismantled?'var(--green)':'var(--cyan)';
+      statusLabel='已生成';
+    }
+    const parts=((g.used_part_ids||g.selected_part_ids)||[]).map(id=>{const p=W.parts_by_id[id];return p?'<a data-id="'+id+'">'+esc(p.name)+'</a>':esc(id);}).join(' · ');
+    html+='<div class="gen-card" data-job="'+esc(g.id||'')+'">'+
+      '<div class="gen-head">'+
+        '<div class="gen-dot" style="background:'+color+'"></div>'+
+        '<h3>'+esc(g.name)+'</h3>'+
+        '<span class="gen-status" style="color:'+color+'">'+statusLabel+'</span>'+
+        '<div class="gen-meta"><span>'+esc(g.created_at||'')+'</span><span>'+(((g.used_part_ids||g.selected_part_ids)||[]).length)+' 个零件</span></div>'+
+      '</div>'+
+      '<div class="gen-body">'+
+        (isRun?'<div class="gen-progress">'+(g.progress||[]).map(p=>'<div class="gen-pg-line">'+esc(p)+'</div>').join('')+'</div>':'')+
+        '<div class="gen-timeline">'+
+          '<div class="gen-tl-item">📝 需求提出：'+esc(g.initial_query||g.description||g.name)+'</div>'+
+          (!isRun?'<div class="gen-tl-item">🔍 零件检索：命中 '+((g.used_part_ids||g.selected_part_ids)||[]).length+' 个</div>':'')+
+          (!isRun?'<div class="gen-tl-item">🔧 组装确认：'+esc(g.created_at||'')+'</div>':'')+
+          (g.auto_dismantled?'<div class="gen-tl-item">♻️ 自动拆解回填</div>':'')+'</div>'+
+        (parts?'<div class="gen-basis"><div class="gen-basis-title">📋 选用清单</div><div class="gen-basis-row">'+parts+'</div></div>':'')+
+        (isRun&&g.status==='done'&&g.result?'<div class="gen-result" style="margin-top:10px"><div class="gen-result-head"><span class="gen-path">'+esc(g.result.path||'')+'</span><button class="btn primary btn-install" data-id="'+esc(g.result.id||'')+'" style="margin-left:auto">安装到 WorkBuddy</button></div><pre class="gen-skillmd"><code>'+esc(g.result.content||'')+'</code></pre></div>':'')+
       '</div></div>';
   });
   c.innerHTML=head+html;
-  c.querySelectorAll('.gen-head').forEach(h=>h.onclick=()=>h.parentElement.classList.toggle('open'));
+  c.querySelectorAll('.gen-card').forEach(card=>{
+    const head=card.querySelector('.gen-head');
+    const jobId=card.dataset.job;
+    head.onclick=()=>{
+      card.classList.toggle('open');
+      if(jobId&&card.classList.contains('open'))_startGenPoll(jobId);
+    };
+  });
   c.querySelectorAll('.gen-basis [data-id]').forEach(a=>a.onclick=e=>{e.stopPropagation();const p=W.parts_by_id[a.dataset.id];if(p)toast(p.name+' · '+esc(p.type||''));});
+  c.querySelectorAll('.btn-install').forEach(btn=>{
+    btn.onclick=e=>{e.stopPropagation();_installGenerated(btn.dataset.id,btn);};
+  });
   bindNewSkill();
 }
 function bindNewSkill(){
   const btn=document.getElementById('btnNewSkill');
   if(btn)btn.onclick=()=>openGenModal();
+}
+function _startGenPoll(jobId){
+  const rec=runningGenerations.find(r=>r.id===jobId);
+  if(!rec||rec.status==='done'||rec.status==='error')return;
+  if(rec._timer)return;
+  rec._timer=setInterval(()=>{
+    apiPost('/api/skill/generate-status',{job_id:jobId}).then(d=>{
+      if(!d.ok||!d.job)return;
+      const j=d.job;
+      Object.assign(rec,j);
+      if(currentTab==='skilldev')renderSkillDev(document.getElementById('content'));
+      if(j.status==='done'||j.status==='error'){
+        clearInterval(rec._timer);rec._timer=null;
+      }
+    }).catch(()=>{});
+  },1500);
+}
+function _installGenerated(id,btn){
+  if(!id){toast('请先生成 Skill');return;}
+  btn.disabled=true;btn.textContent='安装中…';
+  apiPost('/api/skill/install',{id:id}).then(d=>{
+    btn.disabled=false;btn.textContent='安装到 WorkBuddy';
+    if(!d.ok){toast('安装失败：'+(d.error||''));return;}
+    toast('已安装到 '+ (d.path||'~/.workbuddy/skills/'));
+  }).catch(e=>{btn.disabled=false;btn.textContent='安装到 WorkBuddy';toast('安装请求失败：'+apiErrorHint(e));});
 }
 
 // ── 拆解任务 ──
@@ -2222,20 +2284,39 @@ function renderGen(c){
   doBtn.onclick=()=>{
     const req=gatherReq();
     if(!req.name||!req.description){toast('请填写 Skill 名称与功能描述');return;}
-    resultBox.style.display='none';
     doBtn.disabled=true;doBtn.textContent='生成中…';
+    // 先关闭弹窗并插入「生成中」记录，再异步下发
+    const jobIdPlaceholder='pending_'+Date.now();
+    runningGenerations.unshift({
+      id:jobIdPlaceholder,
+      name:req.name,
+      description:req.description,
+      tags:req.tags,
+      status:'running',
+      progress:['已提交生成请求…'],
+      created_at:new Date().toISOString(),
+      result:null,error:null,
+    });
+    closeGenModal();
+    clearGenDraft();
+    if(currentTab==='skilldev')renderSkillDev(document.getElementById('content'));
     apiPost('/api/skill/generate',{requirements:req}).then(d=>{
-      doBtn.disabled=false;doBtn.textContent='生成 Skill';
-      if(!d.ok){toast('生成失败：'+(d.error||''));return;}
-      skillMdEl.textContent=d.content||'';
-      pathEl.textContent=d.path||'';
-      resultBox.style.display='block';
-      installBtn.dataset.id=d.id||'';
-      clearGenDraft();
-      toast('Skill 已生成：'+(d.path||''));
-      // 若当前在 Skill开发页，刷新列表
+      const rec=runningGenerations.find(r=>r.id===jobIdPlaceholder);
+      if(!d.ok){
+        if(rec){rec.status='error';rec.error=d.error||'下发失败';rec.progress=['下发失败：'+(d.error||'')];}
+        toast('生成失败：'+(d.error||''));
+        if(currentTab==='skilldev')renderSkillDev(document.getElementById('content'));
+        return;
+      }
+      const jobId=d.job_id;
+      if(rec){rec.id=jobId;rec.progress=['已加入生成队列'];}
+      _startGenPoll(jobId);
+    }).catch(e=>{
+      const rec=runningGenerations.find(r=>r.id===jobIdPlaceholder);
+      if(rec){rec.status='error';rec.error=apiErrorHint(e);rec.progress=['请求失败：'+apiErrorHint(e)];}
+      toast('生成请求失败：'+apiErrorHint(e));
       if(currentTab==='skilldev')renderSkillDev(document.getElementById('content'));
-    }).catch(e=>{doBtn.disabled=false;doBtn.textContent='生成 Skill';toast('生成请求失败：'+apiErrorHint(e));});
+    });
   };
 
   installBtn.onclick=()=>{
