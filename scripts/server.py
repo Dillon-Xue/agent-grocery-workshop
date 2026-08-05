@@ -15,6 +15,9 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from workshop import Workshop
+
 # ── 配置 ──
 WORKBUDDY_ROOT = Path.home() / ".workbuddy"
 SKILLS_DIR = WORKBUDDY_ROOT / "skills"
@@ -163,6 +166,12 @@ class APIHandler(BaseHTTPRequestHandler):
             return self.handle_skill_check_update(payload)
         if path == "/api/open-workbuddy":
             return self.handle_open_workbuddy(payload)
+        if path == "/api/skill/generate-plan":
+            return self.handle_skill_generate_plan(payload)
+        if path == "/api/skill/generate":
+            return self.handle_skill_generate(payload)
+        if path == "/api/skill/install":
+            return self.handle_skill_install(payload)
         return self._error("Unsupported POST endpoint", 404)
 
     def handle_search(self, payload):
@@ -627,6 +636,143 @@ class APIHandler(BaseHTTPRequestHandler):
             "opened_path": opened_path,
         })
 
+    # ── 自动生成 Skill ──
+    def handle_skill_generate_plan(self, payload):
+        requirements = payload.get('requirements') or {}
+        if not requirements.get('name') or not requirements.get('description'):
+            return self._error('请提供 Skill 名称与功能描述')
+        try:
+            ws = Workshop(str(BASE_DIR))
+            result = ws.assemble(requirements)
+            return self._json({
+                'ok': True,
+                'selected': result.get('selected', []),
+                'skipped_conflicts': result.get('skipped_conflicts', []),
+                'added_dependencies': result.get('added_dependencies', []),
+                'notes': result.get('notes', ''),
+            })
+        except Exception as e:
+            return self._error(str(e))
+
+    def handle_skill_generate(self, payload):
+        requirements = payload.get('requirements') or {}
+        name = (requirements.get('name') or '').strip()
+        description = (requirements.get('description') or '').strip()
+        if not name or not description:
+            return self._error('请提供 Skill 名称与功能描述')
+        try:
+            ws = Workshop(str(BASE_DIR))
+            result = ws.assemble(requirements)
+            selected = result.get('selected', [])
+            content = self._generate_skill_content(requirements, selected)
+            gid = re.sub(r'[^a-zA-Z0-9_\\-]+', '_', name).lower() or 'gen'
+            gen = {
+                'id': gid,
+                'name': name,
+                'description': description,
+                'tags': requirements.get('tags', []),
+                'created_at': datetime.now().isoformat(timespec='seconds'),
+                'selected_part_ids': [p.get('id') for p in selected],
+                'notes': result.get('notes', ''),
+            }
+            gdir = ws.record_generation(gen, content)
+            return self._json({
+                'ok': True,
+                'id': gid,
+                'path': str(Path(gdir) / 'SKILL.md'),
+                'content': content,
+            })
+        except Exception as e:
+            return self._error(str(e))
+
+    def _generate_skill_content(self, requirements, selected_parts):
+        llm = CONFIG.get('llm', {})
+        base_url = (llm.get('base_url') or '').rstrip('/')
+        api_key = llm.get('api_key') or ''
+        name = requirements.get('name', '')
+        description = requirements.get('description', '')
+        parts_block = '\\n'.join(
+            '- {0}：{1}'.format(p.get('name', p.get('id', '?')), p.get('description', ''))
+            for p in selected_parts
+        ) or '- （无匹配零件，基于描述生成）'
+        if base_url and api_key:
+            try:
+                system = ('你是一个 WorkBuddy Skill 编写助手。请基于用户需求和下列已选用的零件，'
+                          '生成一份完整、可直接安装到 ~/.workbuddy/skills/ 的 SKILL.md 文本。'
+                          '要求：YAML frontmatter 含 name/description/tags/agent_created: true；'
+                          '正文用 Markdown，含功能说明、用法、选用零件清单。'
+                          '只输出 SKILL.md 文本本身，不要任何解释或代码围栏。')
+                user_msg = ('# 需求\\n名称：{0}\\n描述：{1}\\n\\n# 已选用零件\\n{2}\\n\\n请生成 SKILL.md：'
+                            .format(name, description, parts_block))
+                import urllib.request as _ur
+                req_data = json.dumps({
+                    'model': llm.get('model', 'gpt-4o'),
+                    'messages': [
+                        {'role': 'system', 'content': system},
+                        {'role': 'user', 'content': user_msg},
+                    ],
+                }).encode('utf-8')
+                req = _ur.Request(f'{base_url}/chat/completions', data=req_data, method='POST')
+                req.add_header('Authorization', f'Bearer {api_key}')
+                req.add_header('Content-Type', 'application/json')
+                with _ur.urlopen(req, timeout=120) as resp:
+                    data = json.loads(resp.read().decode('utf-8'))
+                    return data['choices'][0]['message']['content']
+            except Exception:
+                pass
+        return self._build_skill_markdown(requirements, selected_parts)
+
+    def _build_skill_markdown(self, requirements, selected_parts):
+        name = requirements.get('name', '未命名 Skill')
+        description = requirements.get('description', '')
+        tags = requirements.get('tags', [])
+        parts_block = '\\n'.join(
+            '- **{0}**：{1}'.format(p.get('name', p.get('id', '?')), p.get('description', ''))
+            for p in selected_parts
+        ) or '- （无匹配零件，基于描述生成）'
+        return ('---\\n'
+                'name: {0}\\n'
+                'description: {1}\\n'
+                'tags: {2}\\n'
+                'agent_created: true\\n'
+                '---\\n\\n'
+                '# {0}\\n\\n'
+                '{1}\\n\\n'
+                '## 功能\\n'
+                '{1}\\n\\n'
+                '## 选用的零件\\n'
+                '{3}\\n\\n'
+                '## 用法\\n'
+                '1. 在 WorkBuddy 中通过自然语言触发，或在对话框直接调用。\\n'
+                '2. 按上方功能描述提供输入，Skill 返回处理结果。\\n'
+                ).format(name, description, ', '.join(tags) if tags else 'auto-generated', parts_block)
+
+    def handle_skill_install(self, payload):
+        gid = (payload.get('id') or '').strip()
+        if not gid:
+            return self._error('缺少生成记录 id')
+        gdir = BASE_DIR / 'generations' / gid
+        skill_md = gdir / 'SKILL.md'
+        if not skill_md.exists():
+            return self._error('未找到生成记录：{0}'.format(gid))
+        target_name = gid
+        try:
+            text = skill_md.read_text(encoding='utf-8')
+            m = re.search(r'^name:\\s*(.+)$', text, re.MULTILINE)
+            if m:
+                target_name = re.sub(r'[^a-zA-Z0-9_\\-]+', '_', m.group(1).strip()).lower() or gid
+        except Exception:
+            pass
+        dest = SKILLS_DIR / target_name
+        if not safe_under(SKILLS_DIR, dest):
+            return self._error('非法的目标路径')
+        try:
+            if dest.exists():
+                shutil.rmtree(dest)
+            shutil.copytree(gdir, dest)
+            return self._json({'ok': True, 'path': str(dest), 'name': target_name})
+        except Exception as e:
+            return self._error(str(e))
 
 # ── 回收站 / 安全工具（模块级）──
 CONVERSATIONS_DIR = WORKBUDDY_ROOT / "projects"

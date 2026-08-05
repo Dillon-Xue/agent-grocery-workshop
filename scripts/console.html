@@ -658,6 +658,78 @@ tbody tr:hover{background:var(--surface-2)}
   .dash-proto .dp-bottom{grid-template-columns:repeat(3,1fr);height:auto}
   .dash-proto .dp-rec{grid-column:span 1}
 }
+
+/* ── Markdown 渲染（对话页） ── */
+.chat-msg .md-h{line-height:1.35;margin:.5em 0 .3em}
+.chat-msg h1.md-h{font-size:1.2em}
+.chat-msg h2.md-h{font-size:1.1em}
+.chat-msg h3.md-h,.chat-msg h4.md-h,.chat-msg h5.md-h,.chat-msg h6.md-h{font-size:1em}
+.chat-msg .md-p{margin:.35em 0;line-height:1.65}
+.chat-msg .md-pre{background:rgba(0,0,0,.35);border:1px solid rgba(255,255,255,.08);border-radius:8px;padding:10px 12px;overflow:auto;margin:.5em 0}
+.chat-msg .md-pre code{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12px;white-space:pre-wrap;color:#d6e2ff}
+.chat-msg .md-code{background:rgba(255,255,255,.08);border-radius:4px;padding:1px 5px;font-family:ui-monospace,monospace;font-size:.9em;color:#ffd9a0}
+.chat-msg .md-quote{border-left:3px solid #60a5fa;padding:.2em .8em;margin:.4em 0;color:var(--dim);background:rgba(96,165,250,.07)}
+.chat-msg .md-ul{margin:.35em 0;padding-left:1.4em;list-style:disc}
+.chat-msg .md-li{margin:.15em 0;line-height:1.6}
+.chat-msg a{color:#60a5fa;text-decoration:underline}
+mark{background:#fde047;color:#1a1a1a;border-radius:3px;padding:0 2px;font-weight:600}
+.hl-count{color:#1a1a1a;background:#fde047;border-radius:10px;padding:1px 8px;font-size:11px;margin-left:6px}
+.sr-snippet mark,.sr-code mark{background:#fde047;color:#1a1a1a;border-radius:3px;padding:0 2px}
+
+/* ── 生成Skill 页 ── */
+.gen-page{max-width:880px;margin:0 auto;padding:22px 26px 40px}
+.gen-head{font-family:var(--dp-display);font-size:22px;font-weight:700;margin-bottom:6px}
+.gen-desc{color:var(--dim);font-size:12.5px;line-height:1.7;margin-bottom:18px}
+.gen-form label{display:block;font-size:12px;color:var(--faint);margin:12px 0 5px}
+.gen-form input,.gen-form textarea{width:100%;background:rgba(255,255,255,.05);border:1px solid var(--border);border-radius:8px;color:var(--fg);padding:9px 11px;font-size:13px;font-family:inherit;box-sizing:border-box}
+.gen-form textarea{resize:vertical;line-height:1.6}
+.gen-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.gen-actions{display:flex;gap:10px;margin-top:18px}
+.gen-plan{margin-top:22px}
+.gen-plan h4{font-size:13px;margin:14px 0 8px;color:#60a5fa}
+.gen-part{border:1px solid var(--border);border-radius:10px;padding:10px 12px;margin:8px 0;background:rgba(255,255,255,.03)}
+.gen-part .gp-name{font-weight:600;font-size:13px}
+.gen-part .gp-id{font-size:11px;color:var(--faint);margin-left:6px}
+.gen-part .gp-note{font-size:11px;color:var(--dim);margin-top:4px}
+.gen-note{font-size:12px;color:var(--dim);background:rgba(96,165,250,.07);border-left:3px solid #60a5fa;padding:8px 12px;border-radius:6px;margin:10px 0;white-space:pre-wrap;line-height:1.6}
+.gen-result{margin-top:20px}
+.gen-result textarea{width:100%;height:320px;background:#0a0e14;border:1px solid var(--border);border-radius:10px;color:#d6e2ff;font-family:ui-monospace,monospace;font-size:12px;padding:12px;box-sizing:border-box;white-space:pre;line-height:1.55}
+.gen-result .gen-ok{color:#34d399;font-size:13px;margin:10px 0}
+.gen-install-path{font-size:12px;color:var(--faint);margin-top:8px;word-break:break-all}
+/* ── 生成 Skill ── */
+.gen-grid{display:grid;grid-template-columns:1fr 1fr;gap:20px;align-items:start}
+.gen-card{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:18px}
+.gen-head{font-weight:600;margin-bottom:14px;color:var(--text);font-size:15px}
+.gen-row{margin-bottom:12px;display:flex;flex-direction:column;gap:6px}
+.gen-row label{font-size:12px;color:var(--dim)}
+.gen-row input,.gen-row textarea{background:var(--surface-2);border:1px solid var(--line);color:var(--text);border-radius:8px;padding:9px 11px;font:inherit;resize:vertical}
+.gen-actions{display:flex;gap:10px;margin-top:6px}
+.gen-plan{margin-top:6px}
+.gen-empty{color:var(--dim);font-size:13px;padding:10px 0}
+.gen-err{color:var(--red)}
+.gen-notes{background:var(--surface-2);border-left:3px solid var(--accent,#4b9cff);padding:10px 12px;border-radius:8px;font-size:13px;color:var(--text);white-space:pre-wrap;margin-bottom:12px}
+.gen-parts{display:flex;flex-direction:column;gap:8px}
+.gen-part{background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:9px 11px}
+.gp-name{display:block;font-weight:600;font-size:13px;color:var(--text)}
+.gp-desc{display:block;font-size:12px;color:var(--dim);margin-top:3px}
+.gen-result{margin-top:14px}
+.gen-result-head{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+.gen-path{font-size:12px;color:var(--dim);font-family:ui-monospace,monospace;word-break:break-all}
+.gen-skillmd{max-height:420px;overflow:auto;background:#0d1117;border:1px solid var(--line);border-radius:10px;padding:14px;font-family:ui-monospace,Menlo,monospace;font-size:12.5px;line-height:1.6;color:#c9d1d9;white-space:pre-wrap;margin:0}
+/* ── 搜索命中高亮 ── */
+mark.sr-hl{background:rgba(250,204,21,.35);color:inherit;border-radius:3px;padding:0 1px}
+.hl-count{color:#facc15;font-weight:600}
+/* ── Markdown 渲染 ── */
+.md-h{margin:10px 0 6px;line-height:1.3;color:var(--text)}
+.md-h1{font-size:19px}.md-h2{font-size:16px}.md-h3{font-size:14px}.md-h4{font-size:13px}
+.md-p{margin:6px 0;line-height:1.65}
+.md-li{position:relative;margin:3px 0;padding-left:18px;line-height:1.6}
+.md-li::before{content:'•';position:absolute;left:4px;color:var(--accent,#4b9cff)}
+.md-li.md-ol::before{content:'◦';color:var(--dim)}
+.md-quote{margin:8px 0;padding:6px 12px;border-left:3px solid var(--line);color:var(--dim);background:var(--surface-2);border-radius:6px}
+.md-code{background:#0d1117;color:#c9d1d9;border-radius:8px;padding:12px;overflow:auto;font-family:ui-monospace,monospace;font-size:12.5px;margin:8px 0}
+.md-icode{background:var(--surface-2);border:1px solid var(--line);border-radius:4px;padding:1px 5px;font-family:ui-monospace,monospace;font-size:.92em}
+.md-sp{height:6px}
 </style>
 </head>
 <body>
@@ -677,6 +749,7 @@ tbody tr:hover{background:var(--surface-2)}
       <div class="nav-label">Skill工坊</div>
       <div class="nav-item" data-tab="shelf"><span class="ico">📦</span><span class="txt">模板库</span><span class="badge" id="b-shelf"></span></div>
       <div class="nav-item" data-tab="gens"><span class="ico">📜</span><span class="txt">Skill生成记录</span><span class="badge" id="b-gens"></span></div>
+      <div class="nav-item" data-tab="gen"><span class="ico">🧪</span><span class="txt">生成Skill</span></div>
       <div class="nav-item" data-tab="dismantle"><span class="ico">🛠️</span><span class="txt">任务拆解</span><span class="badge" id="b-dismantle"></span></div>
       <div class="nav-label">Agent</div>
       <div class="nav-item" data-tab="chat"><span class="ico">💬</span><span class="txt">对话</span><span class="badge" id="b-chat"></span></div>
@@ -721,6 +794,7 @@ const TAB_META = {
   storage:   {title:'存储空间',    sub:'日志 / 会话 / 缓存 占用明细与清理建议'},
   shelf:     {title:'模板库',      sub:'模板货架 · Skill 体量解剖 · 双视图翻页'},
   gens:      {title:'Skill生成记录', sub:'Skill 自动组装的产出与选用零件'},
+  gen:       {title:'生成 Skill',  sub:'描述需求，自动拼装零件并生成可安装的 Skill'},
   dismantle: {title:'任务拆解',    sub:'Skill 自动拆解回填进度'},
   chat:      {title:'对话',        sub:'与 Skill 对话 · 查看并检索 WorkBuddy 历史会话'},
   tasks:     {title:'任务',        sub:'自动化任务列表与运行状态'},
@@ -736,6 +810,77 @@ const EMBEDDED_DATA = {"generated_at": "2026-08-04 17:49:14", "overview": {"tota
 
 function toast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2600);}
 function esc(s){return (s||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+function escapeRe(s){return (s||'').replace(/[.*+?^${}()|[\]\\]]/g,'\\$&');}
+// 轻量 Markdown 渲染（离线、无外部依赖），先转义防 XSS
+function mdRender(text){
+  const src=(text||'').replace(/\r\n/g,'\n');
+  const lines=src.split('\n');
+  let html='';let i=0;
+  let inCode=false, codeBuf=[];
+  const flushCode=()=>{ if(codeBuf.length){ html+='<pre class="md-code"><code>'+esc(codeBuf.join('\n'))+'</code></pre>'; codeBuf=[]; } };
+  while(i<lines.length){
+    let line=lines[i];
+    const fence=line.match(/^```(.*)$/);
+    if(fence){ if(inCode){ flushCode(); inCode=false; } else { inCode=true; codeBuf=[]; } i++; continue; }
+    if(inCode){ codeBuf.push(line); i++; continue; }
+    const h=line.match(/^(#{1,4})\s+(.*)$/);
+    if(h){ const lv=h[1].length; html+='<h'+lv+' class="md-h md-h'+lv+'">'+inlineMd(h[2])+'</h'+lv+'>'; i++; continue; }
+    if(/^>\s?/.test(line)){ html+='<blockquote class="md-quote">'+inlineMd(line.replace(/^>\s?/,''))+'</blockquote>'; i++; continue; }
+    if(/^\s*[-*]\s+/.test(line)){ html+='<li class="md-li">'+inlineMd(line.replace(/^\s*[-*]\s+/,''))+'</li>'; i++; continue; }
+    if(/^\s*\d+\.\s+/.test(line)){ html+='<li class="md-li md-ol">'+inlineMd(line.replace(/^\s*\d+\.\s+/,''))+'</li>'; i++; continue; }
+    if(!line.trim()){ html+='<div class="md-sp"></div>'; i++; continue; }
+    html+='<p class="md-p">'+inlineMd(line)+'</p>'; i++;
+  }
+  flushCode();
+  return html;
+}
+function inlineMd(t){
+  let s=esc(t);
+  s=s.replace(/`([^`]+)`/g,'<code class="md-icode">$1</code>');
+  s=s.replace(/\*\*([^*]+)\*\*/g,'<strong>$1</strong>');
+  s=s.replace(/\*([^*]+)\*/g,'<em>$1</em>');
+  s=s.replace(/\[([^\]]+)\]\(([^)]+)\)/g,(m,txt,url)=>{
+    const u=(url||'').trim();
+    const safe=/^(https?:|mailto:|\/|#)/i.test(u);
+    return safe?('<a href="'+u+'" target="_blank" rel="noopener">'+txt+'</a>'):('<span>'+txt+'</span>');
+  });
+  return s;
+}
+// 列表摘要中的关键词高亮（已转义，安全）
+function highlightStr(text,query){
+  const t=esc(text||'');
+  const q=esc((query||'').trim());
+  if(!q)return t;
+  const re=new RegExp('('+escapeRe(q)+')','gi');
+  return t.replace(re,'<mark class="sr-hl">$1</mark>');
+}
+// 在 DOM 子树中高亮关键词，返回匹配数量
+function highlightMatches(root,query){
+  const q=(query||'').trim();
+  if(!q||!root)return 0;
+  const re=new RegExp('('+escapeRe(q)+')','gi');
+  const testRe=new RegExp(escapeRe(q),'i');
+  let count=0;
+  const walker=document.createTreeWalker(root,NodeFilter.SHOW_TEXT,null,false);
+  const targets=[];let node;
+  while(node=walker.nextNode()){
+    if(!node.nodeValue)continue;
+    if(node.parentNode&&(node.parentNode.tagName==='MARK'||(node.parentNode.closest&&node.parentNode.closest('script,style'))))continue;
+    if(testRe.test(node.nodeValue))targets.push(node);
+  }
+  re.lastIndex=0;
+  targets.forEach(n=>{
+    const frag=document.createDocumentFragment();
+    const parts=n.nodeValue.split(re);
+    re.lastIndex=0;
+    parts.forEach(p=>{
+      if(testRe.test(p)){ const m=document.createElement('mark'); m.className='sr-hl'; m.textContent=p; frag.appendChild(m); count++; }
+      else frag.appendChild(document.createTextNode(p));
+    });
+    if(n.parentNode)n.parentNode.replaceChild(frag,n);
+  });
+  return count;
+}
 function sizeH(b){const u=['B','KB','MB','GB'];let n=b;for(const x of u){if(n<1024)return n.toFixed(1)+' '+x;n/=1024;}return n.toFixed(1)+' TB';}
 function fmtNum(n){return (n||0).toLocaleString();}
 function heatColor(h){if(h>0.66)return '#f87171';if(h>0.4)return '#fbbf24';if(h>0.18)return '#22d3ee';return '#48566a';}
@@ -832,7 +977,7 @@ function switchTab(tab){
   document.querySelector('.main').style.overflowY=tab==='overview'?'hidden':'auto';
   closeSkillFloat();
   ({overview:renderOverview,skills:renderSkills,storage:renderStorage,
-    shelf:renderShelf,gens:renderGens,dismantle:renderDismantle,
+    shelf:renderShelf,gens:renderGens,gen:renderGen,dismantle:renderDismantle,
     chat:renderChat,tasks:renderTasks,anomalies:renderAnomalies,settings:renderSettings}[tab])(c);
 }
 
@@ -1729,6 +1874,7 @@ function restoreChatState(){
   }
 }
 let chatTab='history', selectedSession=null, historyGroups=[];
+let chatSearchHighlight=false;
 let chatSearchQuery='', chatSearchResults=null, chatSearching=false;
 function renderChat(c){
   c.style.height='100%';c.style.display='flex';c.style.flexDirection='column';
@@ -1827,7 +1973,7 @@ function renderChatSearchResults(main){
     const rel=findSessionRel(r.project_name,r.session_id);
     return '<div class="search-result chat-search-result" data-rel="'+esc(rel)+'" data-title="'+esc(r.session_title||'')+'" data-proj="'+esc(r.project_name||'')+'" '+(rel?'style="cursor:pointer"':'')+'>'+
       '<div class="sr-head"><span class="pill g">'+esc(r.project_name)+'</span><span class="sr-title" title="'+esc(r.session_title||'')+'">'+esc(r.session_title||'')+'</span><span class="sr-time">'+esc(r.timestamp)+'</span><span class="sr-score">'+esc(String(r.match_score))+'</span></div>'+
-      '<div class="sr-snippet">'+esc(r.summary)+'</div>'+
+      '<div class="sr-snippet">'+highlightStr(r.summary,chatSearchQuery)+'</div>'+
       (r.code_snippet?'<pre class="sr-code"><code>'+esc(r.code_snippet)+'</code></pre>':'')+
     '</div>';
   }).join('');
@@ -1836,7 +1982,8 @@ function renderChatSearchResults(main){
   main.querySelectorAll('.chat-search-result[data-rel]').forEach(el=>{
     el.onclick=()=>{
       if(!el.dataset.rel)return;
-      chatSearchResults=null;chatSearchQuery='';
+      chatSearchHighlight=true; // 保留关键词，进入详情页后高亮命中
+      chatSearchResults=null;
       selectedSession={rel:el.dataset.rel,title:el.dataset.title,project:el.dataset.proj};
       renderHistoryTree();renderHistoryMain();
     };
@@ -1854,9 +2001,19 @@ function loadSessionDetail(sess){
       const role=m.role==='user'?'user':(m.role==='assistant'?'assistant':'reasoning');
       const label=role==='user'?'你':(role==='assistant'?'助手':'思考');
       const time=m.time?fmtChatTime(m.time):'';
-      return '<div class="chat-msg '+role+'"><div class="chat-msg-role">'+label+'</div>'+esc(m.content).replace(/\n/g,'<br>')+(time?'<div class="chat-msg-time">'+time+'</div>':'')+'</div>';
+      return '<div class="chat-msg '+role+'"><div class="chat-msg-role">'+label+'</div>'+mdRender(m.content)+(time?'<div class="chat-msg-time">'+time+'</div>':'')+'</div>';
     }).join('');
     list.scrollTop=list.scrollHeight;
+    if(chatSearchHighlight){
+      const n=highlightMatches(list,chatSearchQuery);
+      if(n>0){
+        const first=list.querySelector('mark.sr-hl');
+        if(first)first.scrollIntoView({block:'center'});
+        const sub=main.querySelector('.chat-main-sub');
+        if(sub)sub.innerHTML+=' · <span class="hl-count">命中 '+n+' 处</span>';
+      }
+      chatSearchHighlight=false;
+    }
   }).catch(e=>{
     document.getElementById('histMsgList').innerHTML='<div style="align-self:center;color:var(--red)">读取失败：'+esc(apiErrorHint(e))+'</div>';
   });
@@ -1885,7 +2042,7 @@ function renderSkillTab(wrap){
     if(chatMessages.length){
       msgs.innerHTML=chatMessages.map(m=>{
         const cls=m.role==='user'?'you':'boss';
-        const txt=esc(String(m.content||'')).replace(/\n/g,'<br>');
+        const txt=mdRender(String(m.content||''));
         return '<div class="msg '+cls+'">'+txt+'</div>';
       }).join('');
       msgs.scrollTop=msgs.scrollHeight;
@@ -1944,6 +2101,95 @@ function renderAnomalies(c){
 }
 
 // ── 设置 ──
+function renderGen(c){
+  c.innerHTML='<div class="sec-head"><h2>🧪 生成 Skill</h2><p class="sec-sub">描述你的需求，控制台会自动检索零件库、拼装并生成一份可安装的 Skill。</p></div>'+
+    '<div class="gen-grid">'+
+      '<div class="gen-card">'+
+        '<div class="gen-head">① 描述需求</div>'+
+        '<div class="gen-row"><label>Skill 名称</label><input id="genName" placeholder="例如：pdf 表格提取助手"></div>'+
+        '<div class="gen-row"><label>功能描述</label><textarea id="genDesc" rows="5" placeholder="这个 Skill 要做什么？支持哪些输入？产出什么？"></textarea></div>'+
+        '<div class="gen-row"><label>标签（可选，逗号分隔）</label><input id="genTags" placeholder="pdf, 表格, 提取"></div>'+
+        '<div class="gen-actions">'+
+          '<button class="btn" id="genPlan">预览零件选用</button>'+
+          '<button class="btn primary" id="genDo" disabled>生成 Skill</button>'+
+        '</div>'+
+      '</div>'+
+      '<div class="gen-card">'+
+        '<div class="gen-head">② 拼装与产物</div>'+
+        '<div id="genPlanBox" class="gen-plan"><div class="gen-empty">点击「预览零件选用」查看自动匹配的零件。</div></div>'+
+        '<div id="genResult" class="gen-result" style="display:none">'+
+          '<div class="gen-result-head"><span id="genResultPath" class="gen-path"></span><button class="btn primary" id="genInstall" style="margin-left:auto">安装到 WorkBuddy</button></div>'+
+          '<pre class="gen-skillmd"><code id="genSkillMd"></code></pre>'+
+        '</div>'+
+      '</div>'+
+    '</div>';
+
+  const nameEl=document.getElementById('genName');
+  const descEl=document.getElementById('genDesc');
+  const tagsEl=document.getElementById('genTags');
+  const planBtn=document.getElementById('genPlan');
+  const doBtn=document.getElementById('genDo');
+  const planBox=document.getElementById('genPlanBox');
+  const resultBox=document.getElementById('genResult');
+  const skillMdEl=document.getElementById('genSkillMd');
+  const pathEl=document.getElementById('genResultPath');
+  const installBtn=document.getElementById('genInstall');
+  let lastPlan=null;
+
+  const gatherReq=()=>{
+    const name=(nameEl.value||'').trim();
+    const description=(descEl.value||'').trim();
+    const tags=(tagsEl.value||'').split(',').map(t=>t.trim()).filter(Boolean);
+    return {name,description,tags};
+  };
+
+  planBtn.onclick=()=>{
+    const req=gatherReq();
+    if(!req.name||!req.description){toast('请填写 Skill 名称与功能描述');return;}
+    planBox.innerHTML='<div class="gen-empty">检索零件库中…</div>';
+    doBtn.disabled=true;
+    apiPost('/api/skill/generate-plan',{requirements:req}).then(d=>{
+      if(!d.ok){planBox.innerHTML='<div class="gen-empty gen-err">预览失败：'+(d.error||'')+'</div>';return;}
+      lastPlan=d;
+      const sel=d.selected||[];
+      let html='<div class="gen-notes">'+esc(d.notes||'')+'</div>';
+      if(sel.length){
+        html+='<div class="gen-parts">'+sel.map(p=>'<div class="gen-part"><span class="gp-name">'+esc(p.name||p.id||'')+'</span><span class="gp-desc">'+esc(p.description||'')+'</span></div>').join('')+'</div>';
+      }else{
+        html+='<div class="gen-empty">未匹配到现成零件，将基于描述直接生成模板。</div>';
+      }
+      planBox.innerHTML=html;
+      doBtn.disabled=false;
+    }).catch(e=>{planBox.innerHTML='<div class="gen-empty gen-err">请求失败：'+esc(apiErrorHint(e))+'</div>';});
+  };
+
+  doBtn.onclick=()=>{
+    const req=gatherReq();
+    if(!req.name||!req.description){toast('请填写 Skill 名称与功能描述');return;}
+    resultBox.style.display='none';
+    doBtn.disabled=true;doBtn.textContent='生成中…';
+    apiPost('/api/skill/generate',{requirements:req}).then(d=>{
+      doBtn.disabled=false;doBtn.textContent='生成 Skill';
+      if(!d.ok){toast('生成失败：'+(d.error||''));return;}
+      skillMdEl.textContent=d.content||'';
+      pathEl.textContent=d.path||'';
+      resultBox.style.display='block';
+      installBtn.dataset.id=d.id||'';
+      toast('Skill 已生成：'+(d.path||''));
+    }).catch(e=>{doBtn.disabled=false;doBtn.textContent='生成 Skill';toast('生成请求失败：'+apiErrorHint(e));});
+  };
+
+  installBtn.onclick=()=>{
+    const id=installBtn.dataset.id;
+    if(!id){toast('请先生成 Skill');return;}
+    installBtn.disabled=true;installBtn.textContent='安装中…';
+    apiPost('/api/skill/install',{id:id}).then(d=>{
+      installBtn.disabled=false;installBtn.textContent='安装到 WorkBuddy';
+      if(!d.ok){toast('安装失败：'+(d.error||''));return;}
+      toast('已安装到 '+ (d.path||'~/.workbuddy/skills/'));
+    }).catch(e=>{installBtn.disabled=false;installBtn.textContent='安装到 WorkBuddy';toast('安装请求失败：'+apiErrorHint(e));});
+  };
+}
 function renderSettings(c){
   const cur=document.documentElement.getAttribute('data-theme')||'dark';
   const apiBase=getApiBase();
