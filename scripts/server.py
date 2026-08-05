@@ -665,7 +665,7 @@ class APIHandler(BaseHTTPRequestHandler):
             result = ws.assemble(requirements)
             selected = result.get('selected', [])
             content = self._generate_skill_content(requirements, selected)
-            gid = re.sub(r'[^a-zA-Z0-9_\\-]+', '_', name).lower() or 'gen'
+            gid = re.sub(r'[\\s/\\\\:*?"<>|]+', '_', name).lower() or 'gen'
             gen = {
                 'id': gid,
                 'name': name,
@@ -760,7 +760,7 @@ class APIHandler(BaseHTTPRequestHandler):
             text = skill_md.read_text(encoding='utf-8')
             m = re.search(r'^name:\\s*(.+)$', text, re.MULTILINE)
             if m:
-                target_name = re.sub(r'[^a-zA-Z0-9_\\-]+', '_', m.group(1).strip()).lower() or gid
+                target_name = re.sub(r'[\\s/\\\\:*?"<>|]+', '_', m.group(1).strip()).lower() or gid
         except Exception:
             pass
         dest = SKILLS_DIR / target_name
