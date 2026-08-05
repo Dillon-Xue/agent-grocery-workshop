@@ -691,16 +691,47 @@ class APIHandler(BaseHTTPRequestHandler):
             with _generation_jobs_lock:
                 _generation_jobs[job_id].update(kwargs)
 
+        def push(msg):
+            with _generation_jobs_lock:
+                _generation_jobs[job_id].setdefault('progress', []).append(msg)
+
         try:
             update(status='running')
             ws = Workshop(str(BASE_DIR))
-            update(progress=['检索零件库中…'])
+            push('开始检索零件库…')
             result = ws.assemble(requirements)
             selected = result.get('selected', [])
-            update(progress=['已匹配 {0} 个零件，正在生成 SKILL.md…'.format(len(selected))])
+            candidates = result.get('candidates', [])
+            skipped = result.get('skipped_conflicts', [])
+            notes = result.get('notes', '')
+            push('共扫描到 {0} 个候选零件，冲突跳过 {1} 个'.format(len(candidates), len(skipped)))
+            if selected:
+                push('最终确定选用 {0} 个零件：'.format(len(selected)))
+                for p in selected:
+                    reason = self._part_selection_reason(p, requirements)
+                    push('  · {0}（{1}）—— {2}'.format(
+                        p.get('name', p.get('id', '?')),
+                        p.get('type', '未分类'),
+                        reason,
+                    ))
+            else:
+                push('未匹配到现成零件，将基于需求描述直接生成模板。')
+            if notes:
+                push('组装备注：' + notes)
+            push('正在生成 SKILL.md 正文…')
             content = self._generate_skill_content(requirements, selected)
             name = requirements.get('name', '未命名 Skill')
             gid = re.sub(r'[\s/\:*?"<>|]+', '_', name).lower() or 'gen'
+            selected_parts = [
+                {
+                    'id': p.get('id'),
+                    'name': p.get('name', p.get('id')),
+                    'type': p.get('type', '未分类'),
+                    'description': p.get('description', ''),
+                    'reason': self._part_selection_reason(p, requirements),
+                }
+                for p in selected
+            ]
             gen = {
                 'id': gid,
                 'name': name,
@@ -709,7 +740,10 @@ class APIHandler(BaseHTTPRequestHandler):
                 'created_at': datetime.now().isoformat(timespec='seconds'),
                 'selected_part_ids': [p.get('id') for p in selected],
                 'used_part_ids': [p.get('id') for p in selected],
-                'notes': result.get('notes', ''),
+                'selected_parts': selected_parts,
+                'candidates_count': len(candidates),
+                'skipped_count': len(skipped),
+                'notes': notes,
             }
             gdir = ws.record_generation(gen, content)
             update(
@@ -720,6 +754,9 @@ class APIHandler(BaseHTTPRequestHandler):
                     'path': str(Path(gdir) / 'SKILL.md'),
                     'content': content,
                     'generation': gen,
+                    'selected_parts': selected_parts,
+                    'candidates_count': len(candidates),
+                    'skipped_count': len(skipped),
                 },
             )
         except Exception as e:
@@ -744,6 +781,22 @@ class APIHandler(BaseHTTPRequestHandler):
                 'error': job['error'],
             },
         })
+
+    @staticmethod
+    def _part_selection_reason(part, requirements):
+        """给出为什么选中这个零件的简短理由。"""
+        desc = (part.get('description') or '').strip()
+        ptags = set((part.get('tags') or []))
+        rtags = set((requirements.get('tags') or []))
+        matched_tags = ptags & rtags
+        if matched_tags:
+            return '标签匹配「{0}」{1}'.format(
+                '」「'.join(sorted(matched_tags)),
+                '：' + desc if desc else '',
+            )
+        if desc:
+            return '功能匹配：' + desc
+        return '与需求语义相关'
 
     def _generate_skill_content(self, requirements, selected_parts):
         llm = CONFIG.get('llm', {})

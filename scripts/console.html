@@ -747,6 +747,34 @@ mark.sr-hl{background:rgba(250,204,21,.35);color:inherit;border-radius:3px;paddi
   .gen-modal-body .gen-grid{grid-template-columns:1fr}
   .gen-modal{width:min(640px,94vw)}
 }
+/* ── 生成详情抽屉 ── */
+.gen-drawer-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:90;opacity:0;pointer-events:none;transition:opacity .25s}
+.gen-drawer-backdrop.show{opacity:1;pointer-events:auto}
+.gen-drawer{position:fixed;top:0;right:0;width:560px;max-width:90vw;height:100vh;background:var(--surface);border-left:1px solid var(--line);box-shadow:-10px 0 40px rgba(0,0,0,.35);z-index:91;transform:translateX(100%);transition:transform .3s cubic-bezier(.2,.8,.2,1);display:flex;flex-direction:column}
+.gen-drawer.show{transform:translateX(0)}
+.gen-drawer-head{display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid var(--line)}
+.gen-drawer-head h3{margin:0;font-size:16px;color:var(--text)}
+.gen-drawer-head .close{background:none;border:none;color:var(--dim);font-size:24px;line-height:1;cursor:pointer;padding:0 4px}
+.gen-drawer-head .close:hover{color:var(--text)}
+.gen-drawer-body{flex:1;overflow-y:auto;padding:18px 20px}
+.gen-drawer-body .gd-section{margin-bottom:22px}
+.gen-drawer-body .gd-label{font-size:11px;color:var(--dim);margin-bottom:8px;text-transform:uppercase;letter-spacing:.06em}
+.gen-drawer-body .gd-status{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:20px;font-size:12px;font-weight:600;background:rgba(245,158,11,.15);color:var(--amber)}
+.gen-drawer-body .gd-status.done{background:rgba(52,211,153,.15);color:var(--green)}
+.gen-drawer-body .gd-status.err{background:rgba(248,113,113,.15);color:var(--red)}
+.gen-drawer-body .gd-desc{font-size:13px;color:var(--text);line-height:1.65;background:var(--surface-2);padding:10px 12px;border-radius:8px}
+.gen-drawer-body .gd-tags{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.gen-drawer-body .gd-tag{font-size:11px;padding:3px 8px;background:var(--surface-2);border:1px solid var(--line);border-radius:12px;color:var(--dim)}
+.gen-drawer-body .gd-progress{display:flex;flex-direction:column;gap:8px}
+.gen-drawer-body .gd-pg-line{font-size:13px;color:var(--text);padding:9px 11px;background:var(--surface-2);border-radius:8px;border-left:3px solid var(--accent,#4b9cff)}
+.gen-drawer-body .gd-parts{display:flex;flex-direction:column;gap:10px}
+.gen-drawer-body .gd-part{background:var(--surface-2);border:1px solid var(--line);border-radius:10px;padding:12px}
+.gen-drawer-body .gd-part-name{font-weight:600;font-size:14px;color:var(--text);margin-bottom:3px}
+.gen-drawer-body .gd-part-meta{font-size:11px;color:var(--dim);margin-bottom:6px}
+.gen-drawer-body .gd-part-reason{font-size:12px;color:var(--text);line-height:1.55}
+.gen-drawer-body .gd-code{white-space:pre-wrap;font-family:ui-monospace,monospace;font-size:12px;line-height:1.6;background:#0a0e14;border:1px solid var(--line);border-radius:10px;padding:14px;color:#d6e2ff;max-height:420px;overflow:auto}
+.gen-drawer-body .gd-empty{color:var(--dim);font-size:13px}
+.gen-drawer-body .gd-actions{display:flex;gap:10px;margin-top:14px}
 </style>
 </head>
 <body>
@@ -1840,6 +1868,127 @@ window.addEventListener('resize',()=>{
 // ── Skill生成记录 ──
 // 内存中的生成任务（切 tab 不丢，刷新丢失；产物已落盘可重载）
 let runningGenerations=[];
+let openDrawerJobId=null;
+
+function openGenDrawer(record){
+  openDrawerJobId=record.id||null;
+  renderGenDrawerContent(record);
+  const bd=document.getElementById('genDrawerBackdrop'), dr=document.getElementById('genDrawer');
+  if(bd)bd.classList.add('show');
+  if(dr)dr.classList.add('show');
+  if(record._running && record.status!=='done' && record.status!=='error'){
+    _startGenPoll(record.id);
+  }
+}
+function closeGenDrawer(){
+  const bd=document.getElementById('genDrawerBackdrop'), dr=document.getElementById('genDrawer');
+  if(bd)bd.classList.remove('show');
+  if(dr)dr.classList.remove('show');
+  openDrawerJobId=null;
+}
+document.addEventListener('keydown',e=>{if(e.key==='Escape')closeGenDrawer();});
+
+function _drawerSelectedParts(record){
+  const W=DATA.workshop||{}, partsById=W.parts_by_id||{};
+  let sp=record.selected_parts || (record.result&&record.result.selected_parts) || [];
+  if(!sp.length){
+    const ids=record.used_part_ids || record.selected_part_ids || [];
+    sp=ids.map(id=>{
+      const p=partsById[id];
+      return p?{id:id,name:p.name,type:p.type||'零件',description:p.description||'',reason:'来自已选用零件'}:null;
+    }).filter(Boolean);
+  }
+  return sp;
+}
+
+function renderGenDrawerContent(record){
+  const body=document.getElementById('genDrawerBody');
+  const title=document.getElementById('genDrawerTitle');
+  if(!body)return;
+  if(title)title.textContent=record.name||'生成详情';
+  const W=DATA.workshop||{}, partsById=W.parts_by_id||{};
+  const isRun=!!record._running;
+  let statusClass,statusLabel;
+  if(isRun){
+    if(record.status==='error'){statusClass='err';statusLabel='生成失败';}
+    else if(record.status==='done'){statusClass='done';statusLabel='已生成';}
+    else{statusClass='';statusLabel='生成中';}
+  }else{statusClass='done';statusLabel='已生成';}
+
+  const tags=(record.tags||[]).map(t=>'<span class="gd-tag">'+esc(t)+'</span>').join('');
+
+  // 进度
+  let progressHtml='';
+  if(isRun){
+    const lines=record.progress||[];
+    if(lines.length){
+      progressHtml='<div class="gd-progress">'+lines.map(p=>'<div class="gd-pg-line">'+esc(p)+'</div>').join('')+'</div>';
+    }else{
+      progressHtml='<div class="gd-empty">等待开始…</div>';
+    }
+  }else{
+    progressHtml='<div class="gd-progress"><div class="gd-pg-line">✅ 生成完成：'+(record.id ? 'generations/'+esc(record.id)+'/SKILL.md' : '')+'</div></div>';
+  }
+  if(record.status==='error'){
+    progressHtml='<div class="gd-progress"><div class="gd-pg-line" style="border-left-color:var(--red)">❌ '+(record.error||'生成失败')+'</div></div>'+progressHtml;
+  }
+
+  // 选用零件
+  const sp=_drawerSelectedParts(record);
+  let partsHtml='';
+  if(sp.length){
+    partsHtml='<div class="gd-parts">'+sp.map(p=>{
+      const meta=(p.type||'零件')+(p.id?' · '+p.id:'');
+      return '<div class="gd-part"><div class="gd-part-name">'+esc(p.name||p.id)+'</div><div class="gd-part-meta">'+esc(meta)+'</div><div class="gd-part-reason">'+esc(p.reason||p.description||'')+'</div></div>';
+    }).join('')+'</div>';
+  }else{
+    partsHtml='<div class="gd-empty">未匹配到现成零件，基于需求描述直接生成。</div>';
+  }
+
+  // 产物与操作
+  let productHtml='';
+  const content=record.result&&record.result.content || record.content || '';
+  const resultPath=record.result&&record.result.path || (record.id ? 'generations/'+record.id+'/SKILL.md' : '');
+  const installId=record.result&&record.result.id || record.id || '';
+  if(content){
+    productHtml='<pre class="gd-code">'+esc(content)+'</pre>';
+  }else if(!isRun || record.status==='done'){
+    productHtml='<div class="gd-empty">产物 SKILL.md 已落盘。可在列表页点击「安装到 WorkBuddy」或查看本地文件。</div>';
+  }
+  const actionsHtml=(installId && (!isRun || record.status==='done'))
+    ?'<div class="gd-actions"><button class="btn primary" onclick="_installGeneratedFromDrawer()">安装到 WorkBuddy</button></div>'
+    :'';
+
+  body.innerHTML=
+    '<div class="gd-section">'+
+      '<div class="gd-label">状态</div>'+
+      '<span class="gd-status '+statusClass+'">'+statusLabel+'</span>'+
+    '</div>'+
+    '<div class="gd-section">'+
+      '<div class="gd-label">需求</div>'+
+      '<div class="gd-desc">'+esc(record.description||record.initial_query||'(无描述)')+'</div>'+
+      (tags?'<div class="gd-tags">'+tags+'</div>':'')+
+    '</div>'+
+    '<div class="gd-section">'+
+      '<div class="gd-label">生成过程</div>'+progressHtml+
+    '</div>'+
+    '<div class="gd-section">'+
+      '<div class="gd-label">选用零件（'+sp.length+' 个）</div>'+partsHtml+
+    '</div>'+
+    (productHtml?'<div class="gd-section"><div class="gd-label">产物 SKILL.md</div><div class="gd-path" style="font-size:12px;color:var(--dim);margin-bottom:10px;word-break:break-all">'+esc(resultPath)+'</div>'+productHtml+actionsHtml+'</div>':'');
+
+  // 安装按钮需要 id，通过 data 属性暂存
+  if(actionsHtml){
+    const btn=body.querySelector('.gd-actions button');
+    if(btn)btn.dataset.id=installId;
+  }
+}
+function _installGeneratedFromDrawer(){
+  const btn=document.querySelector('#genDrawerBody .gd-actions button');
+  if(!btn || !btn.dataset.id){toast('没有可安装的 Skill');return;}
+  _installGenerated(btn.dataset.id, btn);
+}
+
 function renderSkillDev(c){
   const W=DATA.workshop, savedGens=W.generations||[];
   const head='<div class="sec-head" style="justify-content:space-between"><h2>🧪 Skill开发</h2><button class="btn primary" id="btnNewSkill">新建 Skill</button></div>';
@@ -1861,37 +2010,30 @@ function renderSkillDev(c){
       color=g.auto_dismantled?'var(--green)':'var(--cyan)';
       statusLabel='已生成';
     }
-    const parts=((g.used_part_ids||g.selected_part_ids)||[]).map(id=>{const p=W.parts_by_id[id];return p?'<a data-id="'+id+'">'+esc(p.name)+'</a>':esc(id);}).join(' · ');
+    const ids=(g.used_part_ids||g.selected_part_ids)||[];
+    const parts=ids.map(id=>{const p=W.parts_by_id[id];return p?esc(p.name):esc(id);}).join(' · ');
+    const lastProgress=(g.progress&&g.progress.length)?g.progress[g.progress.length-1]:'';
     html+='<div class="gen-card" data-job="'+esc(g.id||'')+'">'+
       '<div class="gen-head">'+
         '<div class="gen-dot" style="background:'+color+'"></div>'+
         '<h3>'+esc(g.name)+'</h3>'+
         '<span class="gen-status" style="color:'+color+'">'+statusLabel+'</span>'+
-        '<div class="gen-meta"><span>'+esc(g.created_at||'')+'</span><span>'+(((g.used_part_ids||g.selected_part_ids)||[]).length)+' 个零件</span></div>'+
+        '<div class="gen-meta"><span>'+esc(g.created_at||'')+'</span><span>'+ids.length+' 个零件</span></div>'+
       '</div>'+
-      '<div class="gen-body">'+
-        (isRun?'<div class="gen-progress">'+(g.progress||[]).map(p=>'<div class="gen-pg-line">'+esc(p)+'</div>').join('')+'</div>':'')+
-        '<div class="gen-timeline">'+
-          '<div class="gen-tl-item">📝 需求提出：'+esc(g.initial_query||g.description||g.name)+'</div>'+
-          (!isRun?'<div class="gen-tl-item">🔍 零件检索：命中 '+((g.used_part_ids||g.selected_part_ids)||[]).length+' 个</div>':'')+
-          (!isRun?'<div class="gen-tl-item">🔧 组装确认：'+esc(g.created_at||'')+'</div>':'')+
-          (g.auto_dismantled?'<div class="gen-tl-item">♻️ 自动拆解回填</div>':'')+'</div>'+
-        (parts?'<div class="gen-basis"><div class="gen-basis-title">📋 选用清单</div><div class="gen-basis-row">'+parts+'</div></div>':'')+
-        (isRun&&g.status==='done'&&g.result?'<div class="gen-result" style="margin-top:10px"><div class="gen-result-head"><span class="gen-path">'+esc(g.result.path||'')+'</span><button class="btn primary btn-install" data-id="'+esc(g.result.id||'')+'" style="margin-left:auto">安装到 WorkBuddy</button></div><pre class="gen-skillmd"><code>'+esc(g.result.content||'')+'</code></pre></div>':'')+
+      '<div class="gen-body" style="display:block">'+
+        '<div class="gen-desc">'+esc(g.description||g.initial_query||'(无描述)')+'</div>'+
+        (isRun&&lastProgress?'<div class="gen-progress" style="margin-top:10px"><div class="gen-pg-line">'+esc(lastProgress)+'</div></div>':'')+
+        (parts?'<div class="gen-basis" style="margin-top:10px"><span style="color:var(--dim)">选用清单：</span>'+parts+'</div>':'')+
       '</div></div>';
   });
   c.innerHTML=head+html;
   c.querySelectorAll('.gen-card').forEach(card=>{
-    const head=card.querySelector('.gen-head');
-    const jobId=card.dataset.job;
-    head.onclick=()=>{
-      card.classList.toggle('open');
-      if(jobId&&card.classList.contains('open'))_startGenPoll(jobId);
+    card.onclick=()=>{
+      const jobId=card.dataset.job;
+      // 从 all 中找回原始记录（优先运行中）
+      const rec=runningGenerations.find(r=>r.id===jobId) || savedGens.find(g=>g.id===jobId);
+      if(rec)openGenDrawer(rec);
     };
-  });
-  c.querySelectorAll('.gen-basis [data-id]').forEach(a=>a.onclick=e=>{e.stopPropagation();const p=W.parts_by_id[a.dataset.id];if(p)toast(p.name+' · '+esc(p.type||''));});
-  c.querySelectorAll('.btn-install').forEach(btn=>{
-    btn.onclick=e=>{e.stopPropagation();_installGenerated(btn.dataset.id,btn);};
   });
   bindNewSkill();
 }
@@ -1909,6 +2051,7 @@ function _startGenPoll(jobId){
       const j=d.job;
       Object.assign(rec,j);
       if(currentTab==='skilldev')renderSkillDev(document.getElementById('content'));
+      if(openDrawerJobId===jobId)renderGenDrawerContent(rec);
       if(j.status==='done'||j.status==='error'){
         clearInterval(rec._timer);rec._timer=null;
       }
@@ -2220,7 +2363,7 @@ function renderGen(c){
       '<div class="gen-row"><label>标签（可选，逗号分隔）</label><input id="genTags" placeholder="pdf, 表格, 提取"></div>'+
       '<div class="gen-actions">'+
         '<button class="btn" id="genPlan">预览零件选用</button>'+
-        '<button class="btn primary" id="genDo" disabled>生成 Skill</button>'+
+        '<button class="btn primary" id="genDo">生成 Skill</button>'+
       '</div>'+
     '</div>'+
     '<div class="gen-card">'+
@@ -2265,7 +2408,6 @@ function renderGen(c){
     const req=gatherReq();
     if(!req.name||!req.description){toast('请填写 Skill 名称与功能描述');return;}
     planBox.innerHTML='<div class="gen-empty">检索零件库中…</div>';
-    doBtn.disabled=true;
     apiPost('/api/skill/generate-plan',{requirements:req}).then(d=>{
       if(!d.ok){planBox.innerHTML='<div class="gen-empty gen-err">预览失败：'+(d.error||'')+'</div>';return;}
       lastPlan=d;
@@ -2277,7 +2419,6 @@ function renderGen(c){
         html+='<div class="gen-empty">未匹配到现成零件，将基于描述直接生成模板。</div>';
       }
       planBox.innerHTML=html;
-      doBtn.disabled=false;
     }).catch(e=>{planBox.innerHTML='<div class="gen-empty gen-err">请求失败：'+esc(apiErrorHint(e))+'</div>';});
   };
 
@@ -2310,6 +2451,7 @@ function renderGen(c){
       }
       const jobId=d.job_id;
       if(rec){rec.id=jobId;rec.progress=['已加入生成队列'];}
+      if(openDrawerJobId===jobIdPlaceholder){openDrawerJobId=jobId;renderGenDrawerContent(rec);}
       _startGenPoll(jobId);
     }).catch(e=>{
       const rec=runningGenerations.find(r=>r.id===jobIdPlaceholder);
@@ -2504,6 +2646,15 @@ fetch('console_data.json').then(r=>r.json()).then(init).catch(e=>{
 <div id="skill-float" class="skill-float">
   <button class="close" onclick="closeSkillFloat()">×</button>
   <div id="skill-float-body" class="skill-detail-panel"></div>
+</div>
+
+<div id="genDrawerBackdrop" class="gen-drawer-backdrop" onclick="closeGenDrawer()"></div>
+<div id="genDrawer" class="gen-drawer">
+  <div class="gen-drawer-head">
+    <h3 id="genDrawerTitle">生成详情</h3>
+    <button class="close" onclick="closeGenDrawer()">×</button>
+  </div>
+  <div id="genDrawerBody" class="gen-drawer-body"></div>
 </div>
 
 </body>
