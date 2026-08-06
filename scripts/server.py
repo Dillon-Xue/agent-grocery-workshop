@@ -3,12 +3,14 @@
 提供静态文件、对话检索、安全清理、Skill 对话等 API。
 """
 import json
+import logging
 import os
 import re
 import shutil
 import subprocess
 import sys
 import threading
+import traceback
 import urllib.error
 import urllib.request
 import uuid
@@ -19,6 +21,20 @@ from urllib.parse import parse_qs, urlparse
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from workshop import Workshop
+
+# ── 日志 ──
+LOG_DIR = Path.home() / ".workbuddy" / "logs"
+LOG_DIR.mkdir(parents=True, exist_ok=True)
+LOG_FILE = LOG_DIR / "agent-grocery-workshop.log"
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(message)s",
+    handlers=[
+        logging.FileHandler(LOG_FILE, encoding="utf-8"),
+        logging.StreamHandler(sys.stdout),
+    ],
+)
+logger = logging.getLogger("agent-grocery-workshop")
 from dismantle import parse_skill_to_candidates
 from scan_console import scan_workshop as scan_workshop_live
 
@@ -83,7 +99,8 @@ CONFIG = load_config()
 
 class APIHandler(BaseHTTPRequestHandler):
     def log_message(self, fmt, *args):
-        pass  # 关闭默认日志
+        # 记录到文件日志，便于排查「错误日志看不到」问题
+        logger.info(self.address_string() + " " + fmt % args)
 
     def _json(self, data, code=200):
         body = json.dumps(data, ensure_ascii=False).encode("utf-8")
@@ -298,7 +315,6 @@ class APIHandler(BaseHTTPRequestHandler):
             if skill_md.exists():
                 system = skill_md.read_text(encoding="utf-8")[:4000]
         try:
-            import urllib.request
             req_data = json.dumps({"model": model, "messages": ([{"role": "system", "content": system}] if system else []) + messages}).encode("utf-8")
             req = urllib.request.Request(f"{base_url}/chat/completions", data=req_data, method="POST")
             req.add_header("Authorization", f"Bearer {api_key}")
@@ -307,7 +323,16 @@ class APIHandler(BaseHTTPRequestHandler):
                 data = json.loads(resp.read().decode("utf-8"))
                 content = data["choices"][0]["message"]["content"]
                 return self._json({"ok": True, "content": content})
+        except urllib.error.HTTPError as e:
+            body = ""
+            try:
+                body = e.read().decode("utf-8", errors="ignore")[:500]
+            except Exception:
+                pass
+            logger.error(f"/api/chat HTTP {e.code} for model={model}, skill={skill_id}: {body}\n{traceback.format_exc()}")
+            return self._error(f"LLM 请求失败 HTTP {e.code}：{e.reason}。响应：{body or '(无响应体)'}", e.code)
         except Exception as e:
+            logger.error(f"/api/chat 异常 model={model}, skill={skill_id}: {e}\n{traceback.format_exc()}")
             return self._error(str(e))
 
     def handle_config(self, payload):
@@ -514,19 +539,31 @@ class APIHandler(BaseHTTPRequestHandler):
         if not skill_id or ".." in skill_id or skill_id.startswith("/") or skill_id.startswith("\\"):
             return self._error("非法的 Skill ID")
         fp = SKILLS_DIR / skill_id
-        if not safe_under(SKILLS_DIR, fp) or not fp.exists():
-            return self._error(f"Skill 不存在: {skill_id}")
+        if not safe_under(SKILLS_DIR, fp):
+            return self._error(f"非法的 Skill 路径: {skill_id}")
+        # 若目录已不存在，视为已卸载，让前端同步移除列表项（解决「删除后仍展示」问题）
+        if not fp.exists():
+            logger.warning(f"Skill 目录已不存在，按已卸载处理: {fp}")
+            return self._json({
+                "ok": True,
+                "already_removed": True,
+                "backup": "",
+                "note": f"Skill {skill_id} 目录已不存在，已从前端列表同步移除。",
+            })
         ts = datetime.now().strftime("%Y%m%d_%H%M%S")
         backup = BACKUP_DIR / f"skill_{skill_id}_{ts}"
         try:
             BACKUP_DIR.mkdir(parents=True, exist_ok=True)
             shutil.copytree(fp, backup)
         except Exception as e:
+            logger.error(f"Skill 备份失败 {skill_id}: {e}\n{traceback.format_exc()}")
             return self._error(f"备份失败（已取消删除）: {e}")
         try:
             send_to_recycle_bin(fp)
         except Exception as e:
+            logger.error(f"Skill 放入回收站失败 {skill_id}: {e}\n{traceback.format_exc()}")
             return self._error(f"放入回收站失败: {e}（备份已生成于 {backup}）")
+        logger.info(f"Skill 已卸载: {skill_id} -> 回收站 (备份 {backup})")
         return self._json({
             "ok": True, "backup": str(backup),
             "note": f"Skill {skill_id} 已放入系统回收站，可从回收站恢复；备份位于 {backup}。",
@@ -691,6 +728,8 @@ class APIHandler(BaseHTTPRequestHandler):
             content = self._generate_skill_content(requirements, selected)
             name = requirements.get('name', '未命名 Skill')
             gid = re.sub(r'[\s/\:*?"<>|]+', '_', name).lower() or 'gen'
+            # 先生成目录路径，避免在 manifest 中引用未赋值的 gdir
+            gdir = str(BASE_DIR / 'generations' / gid)
             selected_parts = [
                 {
                     'id': p.get('id'),
@@ -746,6 +785,7 @@ class APIHandler(BaseHTTPRequestHandler):
                     _inst_ok = True
             except Exception as _e:
                 _inst_err = str(_e)
+                logger.error(f"Skill 自动安装失败 {gid}: {_inst_err}")
             gen['installed'] = _inst_ok
             # 回写 installed 状态到 manifest.json，供前端「已安装」状态展示与刷新后保留
             try:
@@ -773,6 +813,7 @@ class APIHandler(BaseHTTPRequestHandler):
                 },
             )
         except Exception as e:
+            logger.error(f"Skill 生成任务 {job_id} 失败: {e}\n{traceback.format_exc()}")
             update(status='error', error=str(e), progress=['生成失败：' + str(e)])
 
     def handle_skill_generate_status(self, payload):
@@ -831,7 +872,7 @@ class APIHandler(BaseHTTPRequestHandler):
         api_key = llm.get('api_key') or ''
         name = requirements.get('name', '')
         description = requirements.get('description', '')
-        parts_block = '\\n'.join(
+        parts_block = '\n'.join(
             '- {0}：{1}'.format(p.get('name', p.get('id', '?')), p.get('description', ''))
             for p in selected_parts
         ) or '- （无匹配零件，基于描述生成）'
@@ -842,7 +883,7 @@ class APIHandler(BaseHTTPRequestHandler):
                           '要求：YAML frontmatter 含 name/description/tags/agent_created: true；'
                           '正文用 Markdown，含功能说明、用法、选用零件清单。'
                           '只输出 SKILL.md 文本本身，不要任何解释或代码围栏。')
-                user_msg = ('# 需求\\n名称：{0}\\n描述：{1}\\n\\n# 已选用零件\\n{2}\\n\\n请生成 SKILL.md：'
+                user_msg = ('# 需求\n名称：{0}\n描述：{1}\n\n# 已选用零件\n{2}\n\n请生成 SKILL.md：'
                             .format(name, description, parts_block))
                 import urllib.request as _ur
                 req_data = json.dumps({
@@ -866,25 +907,25 @@ class APIHandler(BaseHTTPRequestHandler):
         name = requirements.get('name', '未命名 Skill')
         description = requirements.get('description', '')
         tags = requirements.get('tags', [])
-        parts_block = '\\n'.join(
+        parts_block = '\n'.join(
             '- **{0}**：{1}'.format(p.get('name', p.get('id', '?')), p.get('description', ''))
             for p in selected_parts
         ) or '- （无匹配零件，基于描述生成）'
-        return ('---\\n'
-                'name: {0}\\n'
-                'description: {1}\\n'
-                'tags: {2}\\n'
-                'agent_created: true\\n'
-                '---\\n\\n'
-                '# {0}\\n\\n'
-                '{1}\\n\\n'
-                '## 功能\\n'
-                '{1}\\n\\n'
-                '## 选用的零件\\n'
-                '{3}\\n\\n'
-                '## 用法\\n'
-                '1. 在 WorkBuddy 中通过自然语言触发，或在对话框直接调用。\\n'
-                '2. 按上方功能描述提供输入，Skill 返回处理结果。\\n'
+        return ('---\n'
+                'name: {0}\n'
+                'description: {1}\n'
+                'tags: {2}\n'
+                'agent_created: true\n'
+                '---\n\n'
+                '# {0}\n\n'
+                '{1}\n\n'
+                '## 功能\n'
+                '{1}\n\n'
+                '## 选用的零件\n'
+                '{3}\n\n'
+                '## 用法\n'
+                '1. 在 WorkBuddy 中通过自然语言触发，或在对话框直接调用。\n'
+                '2. 按上方功能描述提供输入，Skill 返回处理结果。\n'
                 ).format(name, description, ', '.join(tags) if tags else 'auto-generated', parts_block)
 
     def handle_skill_install(self, payload):
@@ -1003,21 +1044,41 @@ CONVERSATIONS_DIR = WORKBUDDY_ROOT / "projects"
 
 
 def send_to_recycle_bin(target: Path):
-    """将文件或目录移入 Windows 回收站（非直接删除，可恢复）。"""
+    """将文件或目录移入系统回收站（非直接删除，可恢复）。
+
+    兼容 Windows（PowerShell）与 Linux/WSL（gio trash / trash-put）。
+    """
     target = target.resolve()
-    pth = str(target).replace('"', '`"')
-    if target.is_dir():
-        ps = ('Add-Type -AssemblyName Microsoft.VisualBasic;'
-              '[Microsoft.VisualBasic.FileIO.FileSystem]::DeleteDirectory('
-              '"{pth}",[Microsoft.VisualBasic.FileIO.UIOption]::OnlyErrorDialogs,'
-              '[Microsoft.VisualBasic.FileIO.RecycleOption]::SendToRecycleBin)').format(pth=pth)
-    else:
-        ps = ('Add-Type -AssemblyName Microsoft.VisualBasic;'
-              '[Microsoft.VisualBasic.FileIO.FileSystem]::DeleteFile('
-              '"{pth}",[Microsoft.VisualBasic.FileIO.UIOption]::OnlyErrorDialogs,'
-              '[Microsoft.VisualBasic.FileIO.RecycleOption]::SendToRecycleBin)').format(pth=pth)
-    subprocess.run(["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", ps],
-                   check=True, capture_output=True, text=True)
+    if sys.platform == "win32":
+        pth = str(target).replace('"', '`"')
+        if target.is_dir():
+            ps = ('Add-Type -AssemblyName Microsoft.VisualBasic;'
+                  '[Microsoft.VisualBasic.FileIO.FileSystem]::DeleteDirectory('
+                  '"{pth}",[Microsoft.VisualBasic.FileIO.UIOption]::OnlyErrorDialogs,'
+                  '[Microsoft.VisualBasic.FileIO.RecycleOption]::SendToRecycleBin)').format(pth=pth)
+        else:
+            ps = ('Add-Type -AssemblyName Microsoft.VisualBasic;'
+                  '[Microsoft.VisualBasic.FileIO.FileSystem]::DeleteFile('
+                  '"{pth}",[Microsoft.VisualBasic.FileIO.UIOption]::OnlyErrorDialogs,'
+                  '[Microsoft.VisualBasic.FileIO.RecycleOption]::SendToRecycleBin)').format(pth=pth)
+        subprocess.run(["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", ps],
+                       check=True, capture_output=True, text=True)
+        return
+
+    # Linux / WSL：优先 gio trash，其次 trash-put
+    for cmd in (["gio", "trash"], ["trash-put"]):
+        if shutil.which(cmd[0]):
+            try:
+                subprocess.run(cmd + [str(target)], check=True, capture_output=True, text=True)
+                return
+            except Exception:
+                pass
+
+    # 兜底：移动到 ~/.workbuddy/console-backups/.trash_fallback/
+    fallback = BACKUP_DIR / ".trash_fallback"
+    fallback.mkdir(parents=True, exist_ok=True)
+    dest = fallback / (target.name + "_" + datetime.now().strftime("%Y%m%d_%H%M%S"))
+    shutil.move(str(target), str(dest))
 
 
 def safe_under(base, target):
