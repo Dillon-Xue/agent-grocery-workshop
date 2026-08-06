@@ -1326,7 +1326,8 @@ function removeSkillFromData(id){
 }
 
 // ── Skill 管理（治理 + 目录合并）──
-let skSort={key:'token',dir:-1}, skFilter='all', skQuery='';
+let skSort={key:'token',dir:-1}, skFilter='all', skQuery='', skPage=1;
+const SK_PAGE_SIZE=10;
 function renderSkills(c){
   c.innerHTML=`
     <div class="tbl-tools">
@@ -1350,9 +1351,10 @@ function renderSkills(c){
         <th>操作</th>
       </tr></thead>
       <tbody id="sk-body"></tbody>
-    </table></div>`;
-  c.querySelector('#sk-search').addEventListener('input',e=>{skQuery=e.target.value;drawSk();});
-  c.querySelectorAll('.filter').forEach(f=>f.onclick=()=>{skFilter=f.dataset.f;renderSkills(c);});
+    </table></div>
+    <div id="sk-pager" class="pagination"></div>`;
+  c.querySelector('#sk-search').addEventListener('input',e=>{skQuery=e.target.value;skPage=1;drawSk();});
+  c.querySelectorAll('.filter').forEach(f=>f.onclick=()=>{skFilter=f.dataset.f;skPage=1;renderSkills(c);});
   c.querySelectorAll('th[data-k]').forEach(th=>th.onclick=()=>{
     const k=th.dataset.k;if(skSort.key===k)skSort.dir*=-1;else{skSort.key=k;skSort.dir=(k==='display_name'||k==='source')?1:-1;}
     c.querySelectorAll('th').forEach(x=>x.classList.remove('sorted'));th.classList.add('sorted');
@@ -1426,8 +1428,13 @@ function drawSk(){
     return true;
   });
   const k=skSort.key;arr.sort((a,b)=>{let x=a[k],y=b[k];if(x==null)x='';if(y==null)y='';if(typeof x==='string')return x.localeCompare(y,'zh')*skSort.dir;return (x-y)*skSort.dir;});
+  const totalPages=Math.max(1,Math.ceil(arr.length/SK_PAGE_SIZE));
+  if(skPage>totalPages)skPage=totalPages;
+  if(skPage<1)skPage=1;
+  const start=(skPage-1)*SK_PAGE_SIZE;
+  const pageArr=arr.slice(start,start+SK_PAGE_SIZE);
   const tierCls=t=>({低:'',中:'mid',高:'high',危:'high'}[t]||'');
-  document.getElementById('sk-body').innerHTML=arr.map(s=>`
+  document.getElementById('sk-body').innerHTML=pageArr.map(s=>`
     <tr>
       <td><div class="skill-name" data-tooltip='${tooltipAttr({title:s.display_name,desc:s.description||'暂无描述',tags:[s.source||'',`安装 ${s.install_date||'—'}`,`Token ${(s.token||0).toLocaleString()}`,s.size_human||'',s.status||'']})}'><div class="av">🧩</div><div><div class="nm">${esc(s.display_name)}</div><div class="id">${esc(s.id)}</div></div></div></td>
       <td><span class="src-tag">${esc(s.source)}</span></td>
@@ -1443,9 +1450,28 @@ function drawSk(){
         <button class="btn danger" data-act="del" data-id="${esc(s.id)}">删除</button>
       </div></td>
     </tr>`).join('')||'<tr><td colspan="10"><div class="empty"><div class="e-ico">∅</div>无匹配 Skill</div></td></tr>';
+  renderSkPager(totalPages, arr.length);
   document.querySelectorAll('#sk-body [data-act]').forEach(b=>b.onclick=function(){
     const s=DATA.skills.find(x=>x.id===this.dataset.id);if(!s)return;
     if(this.dataset.act==='up')upgradeSkill(s);else deleteSkill(s);
+  });
+}
+function renderSkPager(totalPages,totalItems){
+  const pager=document.getElementById('sk-pager');
+  if(!pager)return;
+  if(totalPages<=1){pager.innerHTML='';return;}
+  pager.innerHTML=`<button ${skPage<=1?'disabled':''} data-pg="first">⏮ 首页</button>
+    <button ${skPage<=1?'disabled':''} data-pg="prev">◀ 上一页</button>
+    <span class="page-info">第 ${skPage} / ${totalPages} 页（共 ${totalItems} 条）</span>
+    <button ${skPage>=totalPages?'disabled':''} data-pg="next">下一页 ▶</button>
+    <button ${skPage>=totalPages?'disabled':''} data-pg="last">末页 ⏭</button>`;
+  pager.querySelectorAll('button[data-pg]').forEach(btn=>btn.onclick=()=>{
+    const a=btn.dataset.pg;
+    if(a==='first')skPage=1;
+    else if(a==='prev')skPage--;
+    else if(a==='next')skPage++;
+    else if(a==='last')skPage=totalPages;
+    drawSk();
   });
 }
 
