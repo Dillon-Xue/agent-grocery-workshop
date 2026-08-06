@@ -493,6 +493,14 @@ def scan_workshop():
             except Exception:
                 pass
 
+    # 实时计算每个零件的引用次数（被哪些生成记录 used_part_ids 引用）
+    usage_counts = {}
+    for g in generations:
+        for pid in g.get("used_part_ids") or []:
+            usage_counts[pid] = usage_counts.get(pid, 0) + 1
+    for pid, part in parts_by_id.items():
+        part["usage_count"] = usage_counts.get(pid, 0)
+
     stats = {
         "parts": len(parts_by_id),
         "generations": len(generations),
@@ -569,7 +577,7 @@ def main():
 
     # 6
     workshop = scan_workshop()
-    print(f"  [6/6] Skill工坊  →  {workshop['stats']['parts']} 模板 / {workshop['stats']['categories']} 分类 / {workshop['stats']['generations']} 记录")
+    print(f"  [6/6] Skill工坊  →  {workshop['stats']['parts']} 组件 / {workshop['stats']['categories']} 分类 / {workshop['stats']['generations']} 记录")
 
     # 重叠
     overlaps = analyze_overlaps(skills)

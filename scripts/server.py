@@ -20,6 +20,7 @@ from urllib.parse import parse_qs, urlparse
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from workshop import Workshop
 from dismantle import parse_skill_to_candidates
+from scan_console import scan_workshop as scan_workshop_live
 
 # ── 配置 ──
 WORKBUDDY_ROOT = Path.home() / ".workbuddy"
@@ -38,6 +39,11 @@ WORKBUDDY_EXE_CANDIDATES = [
     Path.home() / "AppData" / "Local" / "WorkBuddy" / "WorkBuddy.exe",
     Path("C:/Program Files/WorkBuddy/WorkBuddy.exe"),
 ]
+
+# 「在 WorkBuddy 打开」使用的 URI Scheme（深链）。
+# 用于唤起 WorkBuddy 新建任务窗口并自动选中指定 skill。
+# 若本机未注册该协议，handle_open_workbuddy 会回退为直接启动主程序。
+WORKBUDDY_URI_SCHEME = "workbuddy"
 
 
 def find_workbuddy_exe():
@@ -114,6 +120,8 @@ class APIHandler(BaseHTTPRequestHandler):
             path = "/scripts/console.html"
         if path == "/api/config":
             return self._json({"ok": True, "config": {**CONFIG.get("llm", {}), "skillhub": CONFIG.get("skillhub", {})}})
+        if path == "/api/workshop":
+            return self.handle_workshop_data({})
         if path.startswith("/api/"):
             return self._error("Unsupported GET endpoint", 404)
         # 静态文件
@@ -622,7 +630,24 @@ class APIHandler(BaseHTTPRequestHandler):
         if not exe:
             return self._json({"ok": False, "error": "未找到 WorkBuddy 主程序（WorkBuddy.exe）。请确认 WorkBuddy 已安装。"})
 
-        # 在 Windows 上以 detached 方式启动，避免阻塞 HTTP 请求
+        # 优先用 URI Scheme 深链唤起 WorkBuddy：新建任务窗口并自动选中指定 skill（需求5）
+        if skill_id:
+            try:
+                deep_link = "{0}://new-task?skill={1}".format(WORKBUDDY_URI_SCHEME, urllib.parse.quote(skill_id))
+                if sys.platform == "win32":
+                    os.startfile(deep_link)
+                else:
+                    subprocess.Popen(["xdg-open", deep_link], shell=False, close_fds=True)
+                return self._json({
+                    "ok": True,
+                    "message": "已通过深链唤起 WorkBuddy 并预选 skill：{0}".format(skill_id),
+                    "deep_link": deep_link,
+                })
+            except Exception:
+                # 协议未注册 / 唤起失败，继续走「直接启动主程序」分支
+                pass
+
+        # 回退：直接启动 WorkBuddy 主程序（至少回到 WorkBuddy 页面）
         try:
             flags = subprocess.DETACHED_PROCESS | subprocess.CREATE_NEW_PROCESS_GROUP
         except AttributeError:
@@ -630,23 +655,11 @@ class APIHandler(BaseHTTPRequestHandler):
         try:
             subprocess.Popen([str(exe)], shell=False, creationflags=flags, close_fds=True)
         except Exception as e:
-            return self._json({"ok": False, "error": f"启动 WorkBuddy 失败: {e}"})
-
-        opened_path = None
-        if skill_id:
-            skill_path = SKILLS_DIR / skill_id
-            if safe_under(SKILLS_DIR, skill_path) and skill_path.exists():
-                try:
-                    subprocess.Popen(["explorer", str(skill_path.resolve())], shell=False)
-                    opened_path = str(skill_path)
-                except Exception:
-                    pass
-
+            return self._json({"ok": False, "error": "启动 WorkBuddy 失败: {0}".format(e)})
         return self._json({
             "ok": True,
-            "message": "已启动 WorkBuddy。",
+            "message": "已启动 WorkBuddy。" + ("（本机未注册深链协议，未能自动预选 skill：{0}）".format(skill_id) if skill_id else ""),
             "exe": str(exe),
-            "opened_path": opened_path,
         })
 
     # ── 自动生成 Skill ──
@@ -755,6 +768,46 @@ class APIHandler(BaseHTTPRequestHandler):
                 'auto_dismantled': False,
             }
             gdir = ws.record_generation(gen, content)
+            # 生成完成后默认直接安装到 WorkBuddy（需求4：生成的 skill 默认直接安装）
+            _inst_ok = False
+            _inst_err = ''
+            try:
+                _gd = BASE_DIR / 'generations' / gid / 'SKILL.md'
+                _tname = gid
+                if _gd.exists():
+                    try:
+                        _gt = _gd.read_text(encoding='utf-8')
+                        for _line in _gt.splitlines():
+                            if _line.lower().startswith('name:'):
+                                _tname = _line.split(':', 1)[1].strip() or gid
+                                break
+                    except Exception:
+                        pass
+                _bad = set(' /:*?<>|')
+                _bad.add(chr(34))
+                _bad.add(chr(92))
+                _tname = ''.join('_' if c in _bad else c for c in _tname.lower()) or gid
+                _dest = SKILLS_DIR / _tname
+                if safe_under(SKILLS_DIR, _dest):
+                    if _dest.exists():
+                        shutil.rmtree(_dest)
+                    shutil.copytree(BASE_DIR / 'generations' / gid, _dest)
+                    _inst_ok = True
+            except Exception as _e:
+                _inst_err = str(_e)
+            gen['installed'] = _inst_ok
+            # 回写 installed 状态到 manifest.json，供前端「已安装」状态展示与刷新后保留
+            try:
+                _mp = BASE_DIR / 'generations' / gid / 'manifest.json'
+                _obj = json.loads(_mp.read_text(encoding='utf-8')) if _mp.exists() else {}
+                _obj['installed'] = gen['installed']
+                _mp.write_text(json.dumps(_obj, ensure_ascii=False, indent=2), encoding='utf-8')
+            except Exception:
+                pass
+            if _inst_ok:
+                push('已自动安装到 WorkBuddy（~/.workbuddy/skills）。')
+            else:
+                push('自动安装失败：' + (_inst_err or '未知错误') + '（可在列表点击「重新安装」）。')
             update(
                 status='done',
                 progress=['生成完成：' + str(Path(gdir) / 'SKILL.md')],
@@ -906,12 +959,28 @@ class APIHandler(BaseHTTPRequestHandler):
             if dest.exists():
                 shutil.rmtree(dest)
             shutil.copytree(gdir, dest)
+            # 写回 installed 状态到 manifest.json（需求4：安装结果持久化，刷新后仍显示「已安装」）
+            try:
+                _mp = gdir / 'manifest.json'
+                _obj = json.loads(_mp.read_text(encoding='utf-8')) if _mp.exists() else {}
+                _obj['installed'] = True
+                _mp.write_text(json.dumps(_obj, ensure_ascii=False, indent=2), encoding='utf-8')
+            except Exception:
+                pass
             return self._json({'ok': True, 'path': str(dest), 'name': target_name})
         except Exception as e:
+            # 安装失败也写回 installed=false，便于前端显示「安装失败 / 重新安装」
+            try:
+                _mp = gdir / 'manifest.json'
+                _obj = json.loads(_mp.read_text(encoding='utf-8')) if _mp.exists() else {}
+                _obj['installed'] = False
+                _mp.write_text(json.dumps(_obj, ensure_ascii=False, indent=2), encoding='utf-8')
+            except Exception:
+                pass
             return self._error(str(e))
 
     def handle_skill_dismantle(self, payload):
-        """对 generations/<id>/SKILL.md 执行拆解，返回候选零件并落盘。"""
+        """对 generations/<id>/SKILL.md 执行拆解：识别候选零件、写回 library/（需求1）、记录 manifest。"""
         gid = (payload.get('id') or '').strip()
         if not gid:
             return self._error('缺少生成记录 id')
@@ -921,7 +990,33 @@ class APIHandler(BaseHTTPRequestHandler):
         if not skill_md.exists():
             return self._error('未找到生成记录：{0}'.format(gid))
         try:
+            ws = Workshop(str(BASE_DIR))
             candidates = parse_skill_to_candidates(str(skill_md))
+            # 将候选零件写回零件库 library/，使其在「组件管理」货架中实时可见（需求1）
+            saved_parts = []
+            for i, c in enumerate(candidates):
+                pid = 'part_dm_{0}_{1:03d}'.format(gid, i)
+                part = {
+                    'id': pid,
+                    'name': c.get('name') or '候选零件 {0}'.format(i + 1),
+                    'category': c.get('category') or '参考文档',
+                    'sub_category': c.get('sub_category') or gid,
+                    'type': c.get('type') or '流程规范',
+                    'description': c.get('description') or '',
+                    'content': c.get('content') or '',
+                    'content_format': c.get('content_format') or 'markdown',
+                    'source_type': 'dismantled',
+                    'source_skill_name': c.get('source_skill_name') or gid,
+                    'metadata': dict(c.get('metadata') or {}),
+                    'version': 'v1.0',
+                    'depends_on': [],
+                    'conflicts_with': [],
+                }
+                try:
+                    ws.add_part(part)
+                    saved_parts.append(pid)
+                except Exception:
+                    pass
             now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
             manifest_obj = {}
             if manifest.exists():
@@ -932,10 +1027,25 @@ class APIHandler(BaseHTTPRequestHandler):
             manifest_obj['auto_dismantled'] = True
             manifest_obj['dismantled_at'] = now
             manifest_obj['dismantle_candidates'] = candidates
+            manifest_obj['dismantle_saved_part_ids'] = saved_parts
             manifest.write_text(json.dumps(manifest_obj, ensure_ascii=False, indent=2), encoding='utf-8')
-            return self._json({'ok': True, 'id': gid, 'candidates': candidates, 'count': len(candidates)})
+            return self._json({
+                'ok': True, 'id': gid, 'candidates': candidates,
+                'count': len(candidates), 'saved_parts': saved_parts,
+            })
         except Exception as e:
             return self._error('拆解失败：{0}'.format(e))
+
+    def handle_workshop_data(self, payload):
+        """实时返回零件工坊数据（零件库 + 生成/拆解记录 + 实时引用次数）。
+
+        前端「组件管理 / 概览」优先调用此接口，保证引用次数、拆解入库产物实时刷新（需求1、需求6）。
+        """
+        try:
+            data = scan_workshop_live(str(BASE_DIR))
+            return self._json({'ok': True, 'workshop': data})
+        except Exception as e:
+            return self._error('读取工坊数据失败：' + str(e))
 
 # ── 回收站 / 安全工具（模块级）──
 CONVERSATIONS_DIR = WORKBUDDY_ROOT / "projects"
