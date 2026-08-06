@@ -17,6 +17,13 @@ from collections import defaultdict
 import glob
 import platform
 
+# Windows 终端默认 GBK，无法直接打印 emoji；重配 stdout 为 utf-8，避免启动脚本时报错。
+if sys.platform == "win32":
+    try:
+        sys.stdout.reconfigure(encoding="utf-8")
+    except Exception:
+        pass
+
 # ── 配置 ────────────────────────────────────────────
 WORKBUDDY_HOME = os.path.expanduser("~/.workbuddy")
 SKILLS_DIR = os.path.join(WORKBUDDY_HOME, "skills")
