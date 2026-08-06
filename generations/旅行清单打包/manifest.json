@@ -1,0 +1,61 @@
+{
+  "id": "旅行清单打包",
+  "name": "旅行清单打包",
+  "description": "根据目的地天数和季节生成旅行物品清单",
+  "tags": [
+    "生活",
+    "旅行"
+  ],
+  "created_at": "2026-08-06T18:35:01",
+  "selected_part_ids": [
+    "part_req_005",
+    "part_test_需求分析_004",
+    "part_tool_002"
+  ],
+  "used_part_ids": [
+    "part_req_005",
+    "part_test_需求分析_004",
+    "part_tool_002"
+  ],
+  "selected_parts": [
+    {
+      "id": "part_req_005",
+      "name": "约束条件清单",
+      "type": "流程规范",
+      "description": "技术/资源/时间约束检查清单",
+      "reason": "功能匹配：技术/资源/时间约束检查清单"
+    },
+    {
+      "id": "part_test_需求分析_004",
+      "name": "非功能性需求清单",
+      "type": "流程规范",
+      "description": "性能/安全/可扩展性/可维护性等非功能维度检查",
+      "reason": "功能匹配：性能/安全/可扩展性/可维护性等非功能维度检查"
+    },
+    {
+      "id": "part_tool_002",
+      "name": "requirements模板",
+      "type": "配置文件",
+      "description": "依赖清单格式",
+      "reason": "功能匹配：依赖清单格式"
+    }
+  ],
+  "candidates_count": 3,
+  "skipped_count": 0,
+  "notes": "根据需求《旅行清单打包》检索到 3 个匹配零件。\n无冲突、无额外依赖，零件可直接组装。",
+  "progress": [
+    "已加入生成队列",
+    "开始检索零件库…",
+    "共扫描到 3 个候选零件，冲突跳过 0 个",
+    "最终确定选用 3 个零件：",
+    "  · 约束条件清单（流程规范）—— 功能匹配：技术/资源/时间约束检查清单",
+    "  · 非功能性需求清单（流程规范）—— 功能匹配：性能/安全/可扩展性/可维护性等非功能维度检查",
+    "  · requirements模板（配置文件）—— 功能匹配：依赖清单格式",
+    "组装备注：根据需求《旅行清单打包》检索到 3 个匹配零件。\n无冲突、无额外依赖，零件可直接组装。",
+    "正在生成 SKILL.md 正文…"
+  ],
+  "path": "/home/dillon/workbuddy-skills/agent-grocery-workshop/generations/旅行清单打包/SKILL.md",
+  "status": "done",
+  "auto_dismantled": false,
+  "installed": true
+}

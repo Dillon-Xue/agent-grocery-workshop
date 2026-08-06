@@ -1,0 +1,131 @@
+{
+  "id": "代码注释生成器",
+  "name": "代码注释生成器",
+  "description": "为给定的 Python 函数生成中文 docstring 注释",
+  "tags": [
+    "开发",
+    "Python"
+  ],
+  "created_at": "2026-08-06T18:35:01",
+  "selected_part_ids": [
+    "part_test_测试用例_006",
+    "part_test_代码开发_013",
+    "part_test_测试用例_009",
+    "part_test_参考文档_007",
+    "part_tst_002",
+    "part_test_依赖工具_007",
+    "part_test_依赖工具_006",
+    "part_test_依赖工具_002",
+    "part_test_依赖工具_008",
+    "part_test_依赖工具_009"
+  ],
+  "used_part_ids": [
+    "part_test_测试用例_006",
+    "part_test_代码开发_013",
+    "part_test_测试用例_009",
+    "part_test_参考文档_007",
+    "part_tst_002",
+    "part_test_依赖工具_007",
+    "part_test_依赖工具_006",
+    "part_test_依赖工具_002",
+    "part_test_依赖工具_008",
+    "part_test_依赖工具_009"
+  ],
+  "selected_parts": [
+    {
+      "id": "part_test_测试用例_006",
+      "name": "契约测试生成器",
+      "type": "Python代码",
+      "description": "根据 OpenAPI Spec 自动生成 Provider/Consumer 契约测试用例",
+      "reason": "功能匹配：根据 OpenAPI Spec 自动生成 Provider/Consumer 契约测试用例"
+    },
+    {
+      "id": "part_test_代码开发_013",
+      "name": "单元测试 fixtures 工厂",
+      "type": "Python代码",
+      "description": "pytest fixture 工厂：Mock DB、Fake HTTP、临时文件的通用生成器",
+      "reason": "功能匹配：pytest fixture 工厂：Mock DB、Fake HTTP、临时文件的通用生成器"
+    },
+    {
+      "id": "part_test_测试用例_009",
+      "name": "测试数据工厂",
+      "type": "Python代码",
+      "description": "Faker 集成的批量假数据生成器（用户/订单/商品）",
+      "reason": "功能匹配：Faker 集成的批量假数据生成器（用户/订单/商品）"
+    },
+    {
+      "id": "part_test_参考文档_007",
+      "name": "性能调优手册",
+      "type": "参考文档",
+      "description": "CPU/内存/IO/IOPS 瓶颈定位与优化策略",
+      "reason": "功能匹配：CPU/内存/IO/IOPS 瓶颈定位与优化策略"
+    },
+    {
+      "id": "part_tst_002",
+      "name": "测试数据构造模板",
+      "type": "Python代码片段",
+      "description": "模拟数据生成",
+      "reason": "功能匹配：模拟数据生成"
+    },
+    {
+      "id": "part_test_依赖工具_007",
+      "name": "Secret 轮换脚本",
+      "type": "Python代码",
+      "description": "定期更换 API Key / DB Password 并更新各环境配置的安全工具",
+      "reason": "功能匹配：定期更换 API Key / DB Password 并更新各环境配置的安全工具"
+    },
+    {
+      "id": "part_test_依赖工具_006",
+      "name": "环境差异检测",
+      "type": "Python代码",
+      "description": "dev/staging/prod 三套环境配置 diff 工具，防止配置漂移",
+      "reason": "功能匹配：dev/staging/prod 三套环境配置 diff 工具，防止配置漂移"
+    },
+    {
+      "id": "part_test_依赖工具_002",
+      "name": "Ruff Lint 配置",
+      "type": "配置文件",
+      "description": "统一代码风格：行长度、导入排序、命名规范的 ruff.toml",
+      "reason": "功能匹配：统一代码风格：行长度、导入排序、命名规范的 ruff.toml"
+    },
+    {
+      "id": "part_test_依赖工具_008",
+      "name": "健康检查端点",
+      "type": "Python代码",
+      "description": "/healthz /readyz /livez 三级探针实现（依赖检查 + 就绪判断）",
+      "reason": "功能匹配：/healthz /readyz /livez 三级探针实现（依赖检查 + 就绪判断）"
+    },
+    {
+      "id": "part_test_依赖工具_009",
+      "name": "Prometheus 指标导出",
+      "type": "Python代码",
+      "description": "自定义 Counter/Histogram/Summary 指标注册与 /metrics 端点",
+      "reason": "功能匹配：自定义 Counter/Histogram/Summary 指标注册与 /metrics 端点"
+    }
+  ],
+  "candidates_count": 10,
+  "skipped_count": 0,
+  "notes": "根据需求《代码注释生成器》检索到 10 个匹配零件。\n无冲突、无额外依赖，零件可直接组装。",
+  "progress": [
+    "已加入生成队列",
+    "开始检索零件库…",
+    "共扫描到 10 个候选零件，冲突跳过 0 个",
+    "最终确定选用 10 个零件：",
+    "  · 契约测试生成器（Python代码）—— 功能匹配：根据 OpenAPI Spec 自动生成 Provider/Consumer 契约测试用例",
+    "  · 单元测试 fixtures 工厂（Python代码）—— 功能匹配：pytest fixture 工厂：Mock DB、Fake HTTP、临时文件的通用生成器",
+    "  · 测试数据工厂（Python代码）—— 功能匹配：Faker 集成的批量假数据生成器（用户/订单/商品）",
+    "  · 性能调优手册（参考文档）—— 功能匹配：CPU/内存/IO/IOPS 瓶颈定位与优化策略",
+    "  · 测试数据构造模板（Python代码片段）—— 功能匹配：模拟数据生成",
+    "  · Secret 轮换脚本（Python代码）—— 功能匹配：定期更换 API Key / DB Password 并更新各环境配置的安全工具",
+    "  · 环境差异检测（Python代码）—— 功能匹配：dev/staging/prod 三套环境配置 diff 工具，防止配置漂移",
+    "  · Ruff Lint 配置（配置文件）—— 功能匹配：统一代码风格：行长度、导入排序、命名规范的 ruff.toml",
+    "  · 健康检查端点（Python代码）—— 功能匹配：/healthz /readyz /livez 三级探针实现（依赖检查 + 就绪判断）",
+    "  · Prometheus 指标导出（Python代码）—— 功能匹配：自定义 Counter/Histogram/Summary 指标注册与 /metrics 端点",
+    "组装备注：根据需求《代码注释生成器》检索到 10 个匹配零件。\n无冲突、无额外依赖，零件可直接组装。",
+    "正在生成 SKILL.md 正文…"
+  ],
+  "path": "/home/dillon/workbuddy-skills/agent-grocery-workshop/generations/代码注释生成器/SKILL.md",
+  "status": "done",
+  "auto_dismantled": false,
+  "installed": true
+}

@@ -1,0 +1,131 @@
+{
+  "id": "json_格式化助手",
+  "name": "JSON 格式化助手",
+  "description": "把用户输入的 JSON 字符串美化排版并校验语法",
+  "tags": [
+    "开发",
+    "工具"
+  ],
+  "created_at": "2026-08-06T18:35:00",
+  "selected_part_ids": [
+    "part_cod_006",
+    "part_cod_003",
+    "part_test_依赖工具_003",
+    "part_test_代码开发_011",
+    "part_test_方案设计_009",
+    "part_test_依赖工具_006",
+    "part_tool_002",
+    "part_cod_001",
+    "part_test_参考文档_005",
+    "part_test_参考文档_008"
+  ],
+  "used_part_ids": [
+    "part_cod_006",
+    "part_cod_003",
+    "part_test_依赖工具_003",
+    "part_test_代码开发_011",
+    "part_test_方案设计_009",
+    "part_test_依赖工具_006",
+    "part_tool_002",
+    "part_cod_001",
+    "part_test_参考文档_005",
+    "part_test_参考文档_008"
+  ],
+  "selected_parts": [
+    {
+      "id": "part_cod_006",
+      "name": "日期格式化模板",
+      "type": "Python代码片段",
+      "description": "datetime 统一处理",
+      "reason": "功能匹配：datetime 统一处理"
+    },
+    {
+      "id": "part_cod_003",
+      "name": "JSON处理模板",
+      "type": "Python代码片段",
+      "description": "JSON 序列化/反序列化",
+      "reason": "功能匹配：JSON 序列化/反序列化"
+    },
+    {
+      "id": "part_test_依赖工具_003",
+      "name": "Pre-commit 钩子集",
+      "type": "配置文件",
+      "description": ".pre-commit-config.yaml：ruff 格式化、安全扫描、secret 检测",
+      "reason": "功能匹配：.pre-commit-config.yaml：ruff 格式化、安全扫描、secret 检测"
+    },
+    {
+      "id": "part_test_代码开发_011",
+      "name": "结构化日志初始化",
+      "type": "Python代码",
+      "description": "JSON 格式输出、上下文注入、采样率的 logging 配置",
+      "reason": "功能匹配：JSON 格式输出、上下文注入、采样率的 logging 配置"
+    },
+    {
+      "id": "part_test_方案设计_009",
+      "name": "日志规范设计",
+      "type": "配置文件",
+      "description": "结构化日志格式、级别、采样率、脱敏规则的统一规范",
+      "reason": "功能匹配：结构化日志格式、级别、采样率、脱敏规则的统一规范"
+    },
+    {
+      "id": "part_test_依赖工具_006",
+      "name": "环境差异检测",
+      "type": "Python代码",
+      "description": "dev/staging/prod 三套环境配置 diff 工具，防止配置漂移",
+      "reason": "功能匹配：dev/staging/prod 三套环境配置 diff 工具，防止配置漂移"
+    },
+    {
+      "id": "part_tool_002",
+      "name": "requirements模板",
+      "type": "配置文件",
+      "description": "依赖清单格式",
+      "reason": "功能匹配：依赖清单格式"
+    },
+    {
+      "id": "part_cod_001",
+      "name": "requests库调用模板",
+      "type": "Python代码片段",
+      "description": "带超时与重试的 HTTP 请求封装",
+      "reason": "功能匹配：带超时与重试的 HTTP 请求封装"
+    },
+    {
+      "id": "part_test_参考文档_005",
+      "name": "Git Commit 规范",
+      "type": "参考文档",
+      "description": "Conventional Commits 格式 + commit-msg hook 自动校验",
+      "reason": "功能匹配：Conventional Commits 格式 + commit-msg hook 自动校验"
+    },
+    {
+      "id": "part_test_参考文档_008",
+      "name": "可观测性三支柱",
+      "type": "参考文档",
+      "description": "Metrics / Logs / Traces 统一采集与关联方案",
+      "reason": "功能匹配：Metrics / Logs / Traces 统一采集与关联方案"
+    }
+  ],
+  "candidates_count": 10,
+  "skipped_count": 0,
+  "notes": "根据需求《JSON 格式化助手》检索到 10 个匹配零件。\n无冲突、无额外依赖，零件可直接组装。",
+  "progress": [
+    "已加入生成队列",
+    "开始检索零件库…",
+    "共扫描到 10 个候选零件，冲突跳过 0 个",
+    "最终确定选用 10 个零件：",
+    "  · 日期格式化模板（Python代码片段）—— 功能匹配：datetime 统一处理",
+    "  · JSON处理模板（Python代码片段）—— 功能匹配：JSON 序列化/反序列化",
+    "  · Pre-commit 钩子集（配置文件）—— 功能匹配：.pre-commit-config.yaml：ruff 格式化、安全扫描、secret 检测",
+    "  · 结构化日志初始化（Python代码）—— 功能匹配：JSON 格式输出、上下文注入、采样率的 logging 配置",
+    "  · 日志规范设计（配置文件）—— 功能匹配：结构化日志格式、级别、采样率、脱敏规则的统一规范",
+    "  · 环境差异检测（Python代码）—— 功能匹配：dev/staging/prod 三套环境配置 diff 工具，防止配置漂移",
+    "  · requirements模板（配置文件）—— 功能匹配：依赖清单格式",
+    "  · requests库调用模板（Python代码片段）—— 功能匹配：带超时与重试的 HTTP 请求封装",
+    "  · Git Commit 规范（参考文档）—— 功能匹配：Conventional Commits 格式 + commit-msg hook 自动校验",
+    "  · 可观测性三支柱（参考文档）—— 功能匹配：Metrics / Logs / Traces 统一采集与关联方案",
+    "组装备注：根据需求《JSON 格式化助手》检索到 10 个匹配零件。\n无冲突、无额外依赖，零件可直接组装。",
+    "正在生成 SKILL.md 正文…"
+  ],
+  "path": "/home/dillon/workbuddy-skills/agent-grocery-workshop/generations/json_格式化助手/SKILL.md",
+  "status": "done",
+  "auto_dismantled": false,
+  "installed": true
+}

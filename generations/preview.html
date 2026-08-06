@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>agent-grocery-workshop 修复 & 生成实测报告</title>
+<style>
+  :root {
+    --bg:#f6f8fb; --panel:#fff; --ink:#1f2733; --muted:#6b7785; --line:#e6eaf0;
+    --accent:#2f6df0; --ok:#1f9d57; --ok-bg:#e8f7ef; --warn:#d9822b;
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink);
+    font-family:-apple-system,"Segoe UI","Microsoft YaHei",Roboto,Helvetica,Arial,sans-serif;
+    line-height:1.6; }
+  header { background:linear-gradient(135deg,#2f6df0,#5b8def); color:#fff;
+    padding:28px 32px; }
+  header h1 { margin:0 0 6px; font-size:22px; }
+  header p { margin:0; opacity:.92; font-size:14px; }
+  .wrap { max-width:1080px; margin:0 auto; padding:24px 20px 60px; }
+  h2 { font-size:18px; margin:32px 0 14px; padding-left:10px; border-left:4px solid var(--accent); }
+  .fix { background:var(--panel); border:1px solid var(--line); border-radius:10px;
+    padding:16px 18px; margin-bottom:14px; }
+  .fix-head { display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:8px; }
+  .fix-no { background:var(--accent); color:#fff; font-size:12px; padding:2px 9px; border-radius:20px; }
+  .fix-title { font-weight:600; font-size:15px; }
+  .kv { font-size:13.5px; color:#33404f; margin:5px 0; }
+  .kv b { color:var(--muted); font-weight:600; }
+  .grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(320px,1fr)); gap:16px; }
+  .card { background:var(--panel); border:1px solid var(--line); border-radius:12px;
+    padding:16px 18px; display:flex; flex-direction:column; }
+  .card-head { display:flex; justify-content:space-between; align-items:flex-start; gap:10px; }
+  .card-title { font-size:16px; font-weight:700; }
+  .card-desc { font-size:13px; color:var(--muted); margin-top:2px; }
+  .card-meta { font-size:12px; color:var(--muted); margin:10px 0; }
+  .card-meta code { background:#eef2f7; padding:1px 6px; border-radius:5px; color:#33404f; }
+  .tag { display:inline-block; background:#eef2f7; color:#44505f; font-size:11.5px;
+    padding:2px 8px; border-radius:20px; margin:2px 4px 2px 0; }
+  .badge { font-size:12px; padding:3px 10px; border-radius:20px; white-space:nowrap; }
+  .badge.ok { background:var(--ok-bg); color:var(--ok); font-weight:600; }
+  details { margin-top:6px; }
+  summary { cursor:pointer; font-size:13px; color:var(--accent); user-select:none; }
+  pre { background:#0f172a; color:#e2e8f0; padding:14px; border-radius:8px; overflow:auto;
+    font-size:12px; line-height:1.5; max-height:420px; white-space:pre-wrap; word-break:break-all; }
+  .verify-box { background:var(--ok-bg); border:1px solid #bfe9cf; color:#1d6b41;
+    border-radius:10px; padding:14px 18px; font-size:13.5px; }
+  .verify-box code { background:#d6f0e0; padding:1px 6px; border-radius:5px; }
+  .note { font-size:13px; color:var(--muted); margin-top:10px; }
+  footer { text-align:center; color:var(--muted); font-size:12px; padding:24px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>零件杂货铺 · 修复 & 真实生成实测报告</h1>
+  <p>本次修复 3 个问题，并真实生成 5 个 Skill 验证效果（测试数据已保留）</p>
+</header>
+<div class="wrap">
+
+  <h2>一、修复的三个问题</h2>
+  
+        <div class="fix">
+          <div class="fix-head"><span class="fix-no">问题 1</span>
+            <span class="fix-title">删除 Skill 后列表仍展示 / 报「Skill 不存在」</span>
+            <span class="badge ok">已修复</span></div>
+          <div class="kv"><b>原因：</b>handle_skill_delete：当 Skill 目录已被其它方式移除时，直接返回错误，前端不会从列表移除；且 send_to_recycle_bin 只支持 Windows PowerShell，在 WSL 服务端运行会抛异常导致删除中断。</div>
+          <div class="kv"><b>修复：</b>目录已不存在时返回 ok=True, already_removed=True，前端据此同步移除列表项；send_to_recycle_bin 改为优先 gio trash，其次 trash-put，最后本地回收目录兜底。</div>
+          <div class="kv"><b>验证：</b>test_delete_fix.py 通过：对真实存在与已移除的 Skill 均返回正确结果。</div>
+        </div>
+
+        <div class="fix">
+          <div class="fix-head"><span class="fix-no">问题 2</span>
+            <span class="fix-title">执行报 401 且错误日志看不到原因</span>
+            <span class="badge ok">已修复</span></div>
+          <div class="kv"><b>原因：</b>handle_chat 仅用 except Exception 兜底，HTTP 401 的响应体被吞掉；服务未开启文件日志，控制台「日志」面板拿不到任何信息。</div>
+          <div class="kv"><b>修复：</b>新增文件日志 ~/.workbuddy/logs/agent-grocery-workshop.log；handle_chat 单独捕获 urllib.error.HTTPError，返回带 HTTP 状态码与响应体的详细错误，并把请求与错误写入日志。</div>
+          <div class="kv"><b>验证：</b>test_chat_401_log.py 通过：401 错误信息含状态码，且日志文件中可检索到 /api/chat HTTP 401。</div>
+        </div>
+
+        <div class="fix">
+          <div class="fix-head"><span class="fix-no">问题 3</span>
+            <span class="fix-title">生成 Skill 失败：cannot access local variable &#x27;gdir&#x27;</span>
+            <span class="badge ok">已修复</span></div>
+          <div class="kv"><b>原因：</b>_run_generation_job 中先构造 gen 字典（引用了 gdir），再调用 record_generation 给 gdir 赋值，导致在 gdir 赋值前被引用，抛出 UnboundLocalError；另外 fallback 模板把 \n 写成字面量换行符，生成的 SKILL.md 全挤在一行。</div>
+          <div class="kv"><b>修复：</b>调整顺序：先算 gdir 再构造 gen；_build_skill_markdown / _generate_skill_content 中改用真实换行符。</div>
+          <div class="kv"><b>验证：</b>test_generate_5_skills.py 实际生成 5 个 Skill 全部成功，SKILL.md 换行正常。</div>
+        </div>
+
+  <h2>二、验证结果</h2>
+  <div class="verify-box">
+    ✅ <code>python3 -m py_compile scripts/server.py</code> 通过<br>
+    ✅ <code>pytest tests -q</code>：19 passed<br>
+    ✅ <code>scripts/test_delete_fix.py</code>：删除同步修复通过<br>
+    ✅ <code>scripts/test_chat_401_log.py</code>：401 日志修复通过<br>
+    ✅ <code>scripts/test_generate_5_skills.py</code>：5 个 Skill 全部生成并安装成功
+    <div class="note">提交：<code>45adde1</code> 已 push 到 <code>origin/main</code>。</div>
+  </div>
+
+  <h2>三、真实生成的 5 个 Skill 效果</h2>
+  <div class="grid">
+    
+        <div class="card">
+          <div class="card-head">
+            <div>
+              <div class="card-title">每日早安问候</div>
+              <div class="card-desc">根据天气和日期生成一句温馨的早安问候语</div>
+            </div>
+            <span class="badge ok">已生成并安装</span>
+          </div>
+          <div class="card-meta">ID：<code>每日早安问候</code> &nbsp; 标签：<span class="tag">生活</span> <span class="tag">问候</span></div>
+          <details>
+            <summary>查看完整 SKILL.md</summary>
+            <pre>---
+name: 每日早安问候
+description: 根据天气和日期生成一句温馨的早安问候语
+tags: 生活, 问候
+agent_created: true
+---
+
+# 每日早安问候
+
+根据天气和日期生成一句温馨的早安问候语
+
+## 功能
+根据天气和日期生成一句温馨的早安问候语
+
+## 选用的零件
+- （无匹配零件，基于描述生成）
+
+## 用法
+1. 在 WorkBuddy 中通过自然语言触发，或在对话框直接调用。
+2. 按上方功能描述提供输入，Skill 返回处理结果。
+</pre>
+          </details>
+        </div>
+
+        <div class="card">
+          <div class="card-head">
+            <div>
+              <div class="card-title">JSON 格式化助手</div>
+              <div class="card-desc">把用户输入的 JSON 字符串美化排版并校验语法</div>
+            </div>
+            <span class="badge ok">已生成并安装</span>
+          </div>
+          <div class="card-meta">ID：<code>json_格式化助手</code> &nbsp; 标签：<span class="tag">开发</span> <span class="tag">工具</span></div>
+          <details>
+            <summary>查看完整 SKILL.md</summary>
+            <pre>---
+name: JSON 格式化助手
+description: 把用户输入的 JSON 字符串美化排版并校验语法
+tags: 开发, 工具
+agent_created: true
+---
+
+# JSON 格式化助手
+
+把用户输入的 JSON 字符串美化排版并校验语法
+
+## 功能
+把用户输入的 JSON 字符串美化排版并校验语法
+
+## 选用的零件
+- **日期格式化模板**：datetime 统一处理
+- **JSON处理模板**：JSON 序列化/反序列化
+- **Pre-commit 钩子集**：.pre-commit-config.yaml：ruff 格式化、安全扫描、secret 检测
+- **结构化日志初始化**：JSON 格式输出、上下文注入、采样率的 logging 配置
+- **日志规范设计**：结构化日志格式、级别、采样率、脱敏规则的统一规范
+- **环境差异检测**：dev/staging/prod 三套环境配置 diff 工具，防止配置漂移
+- **requirements模板**：依赖清单格式
+- **requests库调用模板**：带超时与重试的 HTTP 请求封装
+- **Git Commit 规范**：Conventional Commits 格式 + commit-msg hook 自动校验
+- **可观测性三支柱**：Metrics / Logs / Traces 统一采集与关联方案
+
+## 用法
+1. 在 WorkBuddy 中通过自然语言触发，或在对话框直接调用。
+2. 按上方功能描述提供输入，Skill 返回处理结果。
+</pre>
+          </details>
+        </div>
+
+        <div class="card">
+          <div class="card-head">
+            <div>
+              <div class="card-title">会议纪要提炼</div>
+              <div class="card-desc">从会议记录中提取待办事项、决策和责任人</div>
+            </div>
+            <span class="badge ok">已生成并安装</span>
+          </div>
+          <div class="card-meta">ID：<code>会议纪要提炼</code> &nbsp; 标签：<span class="tag">办公</span> <span class="tag">效率</span></div>
+          <details>
+            <summary>查看完整 SKILL.md</summary>
+            <pre>---
+name: 会议纪要提炼
+description: 从会议记录中提取待办事项、决策和责任人
+tags: 办公, 效率
+agent_created: true
+---
+
+# 会议纪要提炼
+
+从会议记录中提取待办事项、决策和责任人
+
+## 功能
+从会议记录中提取待办事项、决策和责任人
+
+## 选用的零件
+- **验收标准提取器**：从需求描述中自动提炼 Given/When/Then 验收条件
+
+## 用法
+1. 在 WorkBuddy 中通过自然语言触发，或在对话框直接调用。
+2. 按上方功能描述提供输入，Skill 返回处理结果。
+</pre>
+          </details>
+        </div>
+
+        <div class="card">
+          <div class="card-head">
+            <div>
+              <div class="card-title">代码注释生成器</div>
+              <div class="card-desc">为给定的 Python 函数生成中文 docstring 注释</div>
+            </div>
+            <span class="badge ok">已生成并安装</span>
+          </div>
+          <div class="card-meta">ID：<code>代码注释生成器</code> &nbsp; 标签：<span class="tag">开发</span> <span class="tag">Python</span></div>
+          <details>
+            <summary>查看完整 SKILL.md</summary>
+            <pre>---
+name: 代码注释生成器
+description: 为给定的 Python 函数生成中文 docstring 注释
+tags: 开发, Python
+agent_created: true
+---
+
+# 代码注释生成器
+
+为给定的 Python 函数生成中文 docstring 注释
+
+## 功能
+为给定的 Python 函数生成中文 docstring 注释
+
+## 选用的零件
+- **契约测试生成器**：根据 OpenAPI Spec 自动生成 Provider/Consumer 契约测试用例
+- **单元测试 fixtures 工厂**：pytest fixture 工厂：Mock DB、Fake HTTP、临时文件的通用生成器
+- **测试数据工厂**：Faker 集成的批量假数据生成器（用户/订单/商品）
+- **性能调优手册**：CPU/内存/IO/IOPS 瓶颈定位与优化策略
+- **测试数据构造模板**：模拟数据生成
+- **Secret 轮换脚本**：定期更换 API Key / DB Password 并更新各环境配置的安全工具
+- **环境差异检测**：dev/staging/prod 三套环境配置 diff 工具，防止配置漂移
+- **Ruff Lint 配置**：统一代码风格：行长度、导入排序、命名规范的 ruff.toml
+- **健康检查端点**：/healthz /readyz /livez 三级探针实现（依赖检查 + 就绪判断）
+- **Prometheus 指标导出**：自定义 Counter/Histogram/Summary 指标注册与 /metrics 端点
+
+## 用法
+1. 在 WorkBuddy 中通过自然语言触发，或在对话框直接调用。
+2. 按上方功能描述提供输入，Skill 返回处理结果。
+</pre>
+          </details>
+        </div>
+
+        <div class="card">
+          <div class="card-head">
+            <div>
+              <div class="card-title">旅行清单打包</div>
+              <div class="card-desc">根据目的地天数和季节生成旅行物品清单</div>
+            </div>
+            <span class="badge ok">已生成并安装</span>
+          </div>
+          <div class="card-meta">ID：<code>旅行清单打包</code> &nbsp; 标签：<span class="tag">生活</span> <span class="tag">旅行</span></div>
+          <details>
+            <summary>查看完整 SKILL.md</summary>
+            <pre>---
+name: 旅行清单打包
+description: 根据目的地天数和季节生成旅行物品清单
+tags: 生活, 旅行
+agent_created: true
+---
+
+# 旅行清单打包
+
+根据目的地天数和季节生成旅行物品清单
+
+## 功能
+根据目的地天数和季节生成旅行物品清单
+
+## 选用的零件
+- **约束条件清单**：技术/资源/时间约束检查清单
+- **非功能性需求清单**：性能/安全/可扩展性/可维护性等非功能维度检查
+- **requirements模板**：依赖清单格式
+
+## 用法
+1. 在 WorkBuddy 中通过自然语言触发，或在对话框直接调用。
+2. 按上方功能描述提供输入，Skill 返回处理结果。
+</pre>
+          </details>
+        </div>
+  </div>
+  <div class="note">
+    数据保留位置：<br>
+    · 源码侧：<code>/home/dillon/workbuddy-skills/agent-grocery-workshop/generations/&lt;id&gt;/</code><br>
+    · WorkBuddy 可见：<code>C:\Users\dillon\.workbuddy\skills\&lt;id&gt;\</code><br>
+    · 测试报告：<code>generations/test_generate_5_skills_report.json</code><br>
+    · 运行日志：<code>~/.workbuddy/logs/agent-grocery-workshop.log</code>
+  </div>
+
+  <h2>四、查看实时控制台（可选）</h2>
+  <div class="note">
+    如需查看完整交互式控制台（Skill 列表 / 删除 / 执行 / 生成），可启动后端服务：<br>
+    <code>cd /home/dillon/workbuddy-skills/agent-grocery-workshop &amp;&amp; python3 scripts/server.py 8765</code><br>
+    然后在浏览器打开 <code>http://127.0.0.1:8765/console.html</code>（或经 WSL 端口转发到 Windows 访问）。
+  </div>
+
+</div>
+<footer>由 WorkBuddy 生成 · agent-grocery-workshop · 5 个 Skill 实测</footer>
+</body>
+</html>
