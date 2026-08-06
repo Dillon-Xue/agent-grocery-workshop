@@ -1042,7 +1042,7 @@ class APIHandler(BaseHTTPRequestHandler):
         前端「组件管理 / 概览」优先调用此接口，保证引用次数、拆解入库产物实时刷新（需求1、需求6）。
         """
         try:
-            data = scan_workshop_live(str(BASE_DIR))
+            data = scan_workshop_live()
             return self._json({'ok': True, 'workshop': data})
         except Exception as e:
             return self._error('读取工坊数据失败：' + str(e))
