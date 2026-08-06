@@ -182,7 +182,7 @@ def scan_skills():
         body = re.sub(r'^---\s*\n.*?\n---\s*\n', '', content, flags=re.DOTALL)
 
         # ── 基本信息
-        name = fm.get('name', entry)
+        name = fm.get('display_name') or fm.get('name', entry)
         desc = fm.get('description', '')
         if not desc:
             for line in body.split('\n'):
