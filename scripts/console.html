@@ -1252,10 +1252,22 @@ function closeSkillFloat(){
   if(float)float.classList.remove('show');if(bd)bd.classList.remove('show');
 }
 function openSkillPath(id){
-  apiPost('/api/open-workbuddy',{skill_id:id}).then(r=>{
-    if(r.ok) toast(r.message+(r.opened_path?' 已同时打开 Skill 目录。':''));
-    else toast('打开失败：'+(r.error||''));
-  }).catch(e=>toast('打开失败：'+apiErrorHint(e)));
+  // 由前端（浏览器，前台交互进程）直接触发 workbuddy:// 协议唤起。
+  // 之前走后端 server.py 后台进程调用 SetForegroundWindow，被 Windows 的
+  // ForegroundLockTimeout 限制拒绝，导致 WorkBuddy 无法抢到前台（只弹提示不打开）。
+  // 浏览器是前台进程，由它发起协议唤起，Windows 视为用户直接意图，允许 WorkBuddy 置顶。
+  var uri = 'workbuddy://home?skill=' + encodeURIComponent(id || '');
+  try {
+    var a = document.createElement('a');
+    a.href = uri;
+    a.style.display = 'none';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    toast('正在唤起 WorkBuddy（新建任务页面）…');
+  } catch(e) {
+    toast('唤起失败：' + apiErrorHint(e));
+  }
 }
 function chatWithSkill(id){const s=DATA.skills.find(x=>x.id===id);if(!s)return;closeSkillFloat();chatSkill=s;chatMessages=getChatSession(id)?.messages||[];const st=readChatStore();st.lastSkillId=id;writeChatStore(st);switchTab('chat');toast('已切换到「对话」，可继续与 '+s.display_name+' 交流');}
 function deleteSkillById(id){const s=DATA.skills.find(x=>x.id===id);if(s)deleteSkill(s);}

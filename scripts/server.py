@@ -40,11 +40,6 @@ WORKBUDDY_EXE_CANDIDATES = [
     Path("C:/Program Files/WorkBuddy/WorkBuddy.exe"),
 ]
 
-# 「在 WorkBuddy 打开」使用的 URI Scheme（深链）。
-# 用于唤起 WorkBuddy 新建任务窗口并自动选中指定 skill。
-# 若本机未注册该协议，handle_open_workbuddy 会回退为直接启动主程序。
-WORKBUDDY_URI_SCHEME = "workbuddy"
-
 
 def find_workbuddy_exe():
     for p in WORKBUDDY_EXE_CANDIDATES:
@@ -179,8 +174,6 @@ class APIHandler(BaseHTTPRequestHandler):
             return self.handle_skill_delete(payload)
         if path == "/api/skill/check-update":
             return self.handle_skill_check_update(payload)
-        if path == "/api/open-workbuddy":
-            return self.handle_open_workbuddy(payload)
         if path == "/api/skill/generate-plan":
             return self.handle_skill_generate_plan(payload)
         if path == "/api/skill/generate":
@@ -618,44 +611,6 @@ class APIHandler(BaseHTTPRequestHandler):
             "changelog": changelog,
             "advice": advice,
             "skillhub_url": f"https://skillhub.tencent.com/skills/{slug}",
-        })
-
-    def handle_open_workbuddy(self, payload):
-        """启动 WorkBuddy 主程序；如果传入 skill_id，尝试跳到首页并附带 skill 信息。"""
-        skill_id = payload.get("skill_id") or ""
-        if skill_id and (".." in skill_id or skill_id.startswith("/") or skill_id.startswith("\\")):
-            return self._error("非法的 Skill ID")
-
-        exe = find_workbuddy_exe()
-        if not exe:
-            return self._json({"ok": False, "error": "未找到 WorkBuddy 主程序（WorkBuddy.exe）。请确认 WorkBuddy 已安装。"})
-
-        # WorkBuddy 支持的 deep link host 只有 home/chat/skills/expert 等，
-        # 没有 new-task；Windows 下必须用 WorkBuddy.exe 直接带 URI 参数启动，
-        # 才能被 Electron second-instance 处理。os.startfile(workbuddy://...) 会被系统
-        # 当作文件路径 fallback 到资源管理器。
-        args = [str(exe)]
-        if skill_id:
-            deep_link = "{0}://home?skill={1}".format(WORKBUDDY_URI_SCHEME, urllib.parse.quote(skill_id))
-            args.append(deep_link)
-            message = "已唤起 WorkBuddy 首页（新建任务页面），并附带 skill 信息：{0}".format(skill_id)
-        else:
-            deep_link = None
-            message = "已唤起 WorkBuddy 首页（新建任务页面）"
-
-        try:
-            flags = subprocess.DETACHED_PROCESS | subprocess.CREATE_NEW_PROCESS_GROUP
-        except AttributeError:
-            flags = 0
-        try:
-            subprocess.Popen(args, shell=False, creationflags=flags, close_fds=True)
-        except Exception as e:
-            return self._json({"ok": False, "error": "启动 WorkBuddy 失败: {0}".format(e)})
-        return self._json({
-            "ok": True,
-            "message": message,
-            "exe": str(exe),
-            "deep_link": deep_link,
         })
 
     # ── 自动生成 Skill ──
