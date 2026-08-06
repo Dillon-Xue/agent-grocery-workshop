@@ -16,6 +16,7 @@ from datetime import datetime, timedelta
 from collections import defaultdict
 import glob
 import platform
+from pathlib import Path
 
 # Windows 终端默认 GBK，无法直接打印 emoji；重配 stdout 为 utf-8，避免启动脚本时报错。
 if sys.platform == "win32":
@@ -550,10 +551,10 @@ def scan_env():
     }
 
 
-def main():
+def main(argv=None):
     parser = argparse.ArgumentParser(description="WorkBuddy 控制台数据聚合")
     parser.add_argument('--output', '-o', default=None, help='输出 JSON 路径')
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
 
     t0 = datetime.now()
     print(f"🛠️  WorkBuddy 控制台 · 数据聚合  {t0.strftime('%H:%M:%S')}")
@@ -634,12 +635,12 @@ def main():
         ],
     }
 
-    out = args.output or os.path.join(os.path.dirname(os.path.abspath(__file__)), "console_data.json")
+    here = str(Path(__file__).resolve().parent)
+    out = args.output or os.path.join(here, "console_data.json")
     with open(out, 'w', encoding='utf-8') as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
 
     # ── 人偶图：复制到工作目录 assets/，供 console.html 相对路径引用（离线可用）──
-    here = os.path.dirname(os.path.abspath(__file__))
     avatar_src = os.path.join(SKILLS_DIR, "agent-grocery-workshop", "assets", "sprite_avatar.png")
     if os.path.isfile(avatar_src):
         assets_dir = os.path.join(here, "assets")

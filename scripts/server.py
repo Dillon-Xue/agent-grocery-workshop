@@ -37,6 +37,7 @@ logging.basicConfig(
 logger = logging.getLogger("agent-grocery-workshop")
 from dismantle import parse_skill_to_candidates
 from scan_console import scan_workshop as scan_workshop_live
+import scan_console
 
 # ── 配置 ──
 WORKBUDDY_ROOT = Path.home() / ".workbuddy"
@@ -130,6 +131,8 @@ class APIHandler(BaseHTTPRequestHandler):
         path = parsed.path
         if path in ("/", "/console.html"):
             path = "/scripts/console.html"
+        if path == "/console_data.json":
+            path = "/scripts/console_data.json"
         if path == "/api/config":
             return self._json({"ok": True, "config": {**CONFIG.get("llm", {}), "skillhub": CONFIG.get("skillhub", {})}})
         if path == "/api/workshop":
@@ -199,6 +202,8 @@ class APIHandler(BaseHTTPRequestHandler):
             return self.handle_skill_generate_status(payload)
         if path == "/api/skill/generations":
             return self.handle_skill_generations(payload)
+        if path == "/api/workshop":
+            return self.handle_workshop_data(payload)
         if path == "/api/skill/install":
             return self.handle_skill_install(payload)
         if path == "/api/skill/dismantle":
@@ -564,6 +569,15 @@ class APIHandler(BaseHTTPRequestHandler):
             logger.error(f"Skill 放入回收站失败 {skill_id}: {e}\n{traceback.format_exc()}")
             return self._error(f"放入回收站失败: {e}（备份已生成于 {backup}）")
         logger.info(f"Skill 已卸载: {skill_id} -> 回收站 (备份 {backup})")
+        # 删除成功后立即重新生成 console_data.json 快照，避免刷新页面仍看到已删除 skill
+        try:
+            import io, contextlib
+            buf = io.StringIO()
+            with contextlib.redirect_stdout(buf):
+                scan_console.main([])
+            logger.info(f"console_data.json 已重新生成:\n{buf.getvalue()[:500]}")
+        except Exception as e:
+            logger.error(f"删除后重新生成 console_data.json 失败: {e}\n{traceback.format_exc()}")
         return self._json({
             "ok": True, "backup": str(backup),
             "note": f"Skill {skill_id} 已放入系统回收站，可从回收站恢复；备份位于 {backup}。",
@@ -1235,6 +1249,15 @@ def summarize_text(text, llm):
 
 
 def run(port=8080):
+    # 启动时自动生成/刷新 console_data.json 快照，确保页面加载的是最新数据
+    try:
+        import io, contextlib
+        buf = io.StringIO()
+        with contextlib.redirect_stdout(buf):
+            scan_console.main([])
+        logger.info(f"启动时已刷新 console_data.json:\n{buf.getvalue()[:500]}")
+    except Exception as e:
+        logger.error(f"启动时刷新 console_data.json 失败: {e}\n{traceback.format_exc()}")
     print(f"WorkBuddy Console Server: http://0.0.0.0:{port}")
     HTTPServer(("0.0.0.0", port), APIHandler).serve_forever()
 
