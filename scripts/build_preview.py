@@ -174,7 +174,7 @@ html_doc = f"""<!DOCTYPE html>
 </head>
 <body>
 <header>
-  <h1>零件杂货铺 · 修复 & 真实生成实测报告</h1>
+  <h1>WorkBuddy 控制台 · 修复 & 真实生成实测报告</h1>
   <p>本次修复 3 个问题，并真实生成 5 个 Skill 验证效果（测试数据已保留）</p>
 </header>
 <div class="wrap">

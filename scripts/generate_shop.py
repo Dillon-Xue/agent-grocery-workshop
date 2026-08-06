@@ -1,4 +1,4 @@
-"""零件杂货铺 · Agent 管控台 v3 — 自包含 HTML（可纯静态，也可由 server.py 提供实时数据/写操作）。
+"""WorkBuddy 控制台 · Agent 管控台 v3 — 自包含 HTML（可纯静态，也可由 server.py 提供实时数据/写操作）。
 
 数据通过 <script type="application/json"> 注入：{ "workshop": {...零件数据...}, "agent": {...agent 真实数据...} }。
 JS 顶部自动探测：若由 server.py 同源提供（fetch /api/data 成功），则 LIVE=true，启用卸载/清理/备份/压缩/对话等写操作；
@@ -84,7 +84,7 @@ TEMPLATE = """<!doctype html>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>零件杂货铺 · Agent 管控台</title>
+<title>WorkBuddy 控制台 · Agent 管控台</title>
 <style>
   :root{
     --bg:#f5f7fa; --bg2:#fff;
@@ -378,7 +378,7 @@ TEMPLATE = """<!doctype html>
 <body>
 <div class="header">
   <div class="logo">🛰️</div>
-  <div class="htitle"><h1>零件杂货铺 · Agent 管控台</h1>
+  <div class="htitle"><h1>WorkBuddy 控制台 · Agent 管控台</h1>
     <p>你的 Agent 全景：skill 资产管理 · 对话 · 任务 · 异常 · 一键运维</p></div>
   <div class="stats-row" id="stats"></div>
   <div class="search-wrap"><span class="search-icon">🔍</span>
@@ -437,7 +437,7 @@ TEMPLATE = """<!doctype html>
 
   /* ---------- Skill 中文名映射 ---------- */
   const CN_SKILL_NAMES={
-    '零件杂货铺 (Grocery Workshop)':'零件杂货铺',
+    'WorkBuddy 控制台 (Skill Console)':'WorkBuddy 控制台',
     'fde-delivery-assistant':'FDE交付助手',
     'humanizer':'文风人性化',
     'Interview-Debrief':'面试复盘教练',

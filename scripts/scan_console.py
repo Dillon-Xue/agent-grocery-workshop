@@ -49,7 +49,7 @@ STORAGE_CATEGORIES = [
     {"id": "plugins",       "name": "插件",         "path": os.path.join(WORKBUDDY_HOME, "plugins"),          "risk": "never",    "risk_label": "不可删除", "icon": "🔌"},
 ]
 
-# Skill 中文名映射（与零件杂货铺对齐）
+# Skill 中文名映射（与 WorkBuddy 控制台对齐）
 CN_NAMES = {
     "local-chat-search":           "本地会话搜索",
     "top-token-consuming":         "Token消耗审计",
@@ -60,7 +60,7 @@ CN_NAMES = {
     "skill-update-check":          "技能更新检查",
     "skill-scanner":               "安全风险扫描",
     "skill-search":                "智能技能搜索",
-    "agent-grocery-workshop":      "Skill工坊",
+    "agent-grocery-workshop":      "WorkBuddy 控制台",
     "fde-doc-assistant":           "FDE交付助手",
     "humanizer":                   "文本人性化",
     "Interview-Debrief":           "面试复盘教练",
@@ -446,8 +446,8 @@ def analyze_overlaps(skills):
     return sorted(overlaps, key=lambda x: x["score"], reverse=True)
 
 
-# ── 零件工坊数据（来自 agent-grocery-workshop skill）────────────
-# 复用零件杂货铺自身的 library/（零件库）与 generations/（生成 / 拆解记录），
+# ── Skill 工坊数据（来自 agent-grocery-workshop skill）────────────
+# 复用 WorkBuddy 控制台自身的 library/（零件库）与 generations/（生成 / 拆解记录），
 # 使其可视化模块（货架 / 生成 / 拆解 / 人偶胶囊）能在控制台内直接渲染。
 
 def scan_workshop():
