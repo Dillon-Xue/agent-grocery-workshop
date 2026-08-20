@@ -1,0 +1,30 @@
+__pycache__/
+*.pyc
+shop.html
+.venv/
+
+# ── console 本地配置（含 LLM API Key，禁止提交）──
+console_config.json
+# ── console 扫描生成的快照（可重生成）──
+console_data.json
+# ── 开发临时草稿 ──
+_*.json
+_*.py
+_*.js
+_*.cjs
+# ── 运行日志 ──
+server.log
+
+# ── 本地测试套件（未纳入版本管理，仅本机跑 pytest）──
+tests/
+
+# ── 生成的演示 Skill / 报告（可重生成，保持 skill 精简）──
+# 保留 generations/.gitkeep 维持目录；其余演示产物不提交
+generations/*
+scripts/fill_test_data.py
+
+# ── 零件库测试数据（fill_test_data.py 生成的临时零件）──
+library/**/part_test_*.json
+
+# ── pytest 缓存 ──
+.pytest_cache/
