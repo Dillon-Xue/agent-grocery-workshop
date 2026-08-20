@@ -117,16 +117,15 @@
 │   ├── dismantle.py          # 解析 SKILL.md 为候选零件
 │   ├── assemble.py           # 给定需求输出选用零件
 │   ├── seed_initial_parts.py # 初始化种子零件
-│   ├── scan_console.py       # 扫描本机 WorkBuddy，生成控制台数据快照
-│   ├── server.py             # 管控台本地后端（快照 / Skill 增删 / 对话代理 / 搜索 / 生成安装 等接口）
-│   └── generate_shop.py      # 早期解剖图快照（默认不再生成）
+│   ├── scan_console.py       # 扫描本机 WorkBuddy，生成控制台数据快照（唯一数据聚合实现）
+│   └── server.py             # 管控台本地后端（快照 / Skill 增删 / 对话代理 / 搜索 / 生成安装 等接口）
 ├── console.html              # 管控台前端（单文件、零依赖，可离线打开）
 ├── console_data.json         # 本机扫描快照
 ├── console_config.json       # 本地配置（含 LLM / SkillHub 密钥，不入库）
 └── start_console.bat / .ps1  # 启动脚本
 ```
 
-**数据 / 视图解耦**：`library/` 与 `generations/` 是唯一持久数据源；`console.html` 只是视图，由扫描程序把最新数据注入快照，重新生成不会丢失零件或生成记录。`shop.html` 为早期解剖图视图，功能已并入控制台「组件管理 / Skill开发 / 任务拆解」，默认不再生成。
+**数据 / 视图解耦**：`library/` 与 `generations/` 是唯一持久数据源；`console.html` 只是视图，由扫描程序把最新数据注入快照，重新生成不会丢失零件或生成记录。`shop.html` 为早期解剖图视图（其生成脚本 `generate_shop.py` 已移除），功能已并入控制台「组件管理 / Skill开发 / 任务拆解」，现已不再生成。
 
 **前后端协作**：前端 `console.html` 通过浏览器请求本地后端获取实时数据（Skill 增删、对话代理、历史检索、生成安装等）；离线打开时读取已内联的快照，部分需后端的实时功能会受限。
 
