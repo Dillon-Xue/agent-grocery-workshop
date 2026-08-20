@@ -2082,7 +2082,9 @@ function renderGenDrawerContent(record){
     productHtml='<div class="gd-empty">产物 SKILL.md 已落盘。可在列表页点击「安装到 WorkBuddy」或查看本地文件。</div>';
   }
   const actionsHtml=(installId && (!isRun || record.status==='done'))
-    ?'<div class="gd-actions"><button class="btn primary" onclick="_installGeneratedFromDrawer()">安装到 WorkBuddy</button></div>'
+    ?'<div class="gd-actions"><button class="btn primary" onclick="_installGeneratedFromDrawer()">安装到 WorkBuddy</button>'+
+      '<button class="btn" data-act="git" data-id="'+esc(installId)+'">提交 Git</button>'+
+      '<button class="btn" data-act="publish" data-id="'+esc(installId)+'">发布 SkillHub</button></div>'
     :'';
 
   body.innerHTML=
@@ -2107,12 +2109,37 @@ function renderGenDrawerContent(record){
   if(actionsHtml){
     const btn=body.querySelector('.gd-actions button');
     if(btn)btn.dataset.id=installId;
+    body.querySelectorAll('.gd-actions [data-act]').forEach(b=>{
+      b.onclick=(e)=>{e.stopPropagation();
+        const id=b.dataset.id;
+        if(b.dataset.act==='git')_gitSyncGenerated(id,b);
+        else if(b.dataset.act==='publish')_publishGenerated(id,b);
+      };
+    });
   }
 }
 function _installGeneratedFromDrawer(){
   const btn=document.querySelector('#genDrawerBody .gd-actions button');
   if(!btn || !btn.dataset.id){toast('没有可安装的 Skill');return;}
   _installGenerated(btn.dataset.id, btn);
+}
+function _gitSyncGenerated(id,btn){
+  if(!id){toast('请先生成 Skill');return;}
+  if(btn){btn.disabled=true;btn.textContent='提交中…';}
+  apiPost('/api/skill/git',{id:id}).then(d=>{
+    if(btn){btn.disabled=false;btn.textContent='提交 Git';}
+    if(!d.ok){toast('Git 同步失败：'+(d.error||''));return;}
+    toast('已提交 Git：'+(d.repo_url||'')+(d.steps&&d.steps.length?'\n'+d.steps.join('；'):''));
+  }).catch(e=>{if(btn){btn.disabled=false;btn.textContent='提交 Git';}toast('请求失败：'+apiErrorHint(e));});
+}
+function _publishGenerated(id,btn){
+  if(!id){toast('请先生成 Skill');return;}
+  if(btn){btn.disabled=true;btn.textContent='发布中…';}
+  apiPost('/api/skill/publish',{id:id}).then(d=>{
+    if(btn){btn.disabled=false;btn.textContent='发布 SkillHub';}
+    if(!d.ok){toast('发布失败：'+(d.error||''));return;}
+    toast('SkillHub 发布成功'+(d.verify?'\n验证：'+d.verify:''));
+  }).catch(e=>{if(btn){btn.disabled=false;btn.textContent='发布 SkillHub';}toast('请求失败：'+apiErrorHint(e));});
 }
 
 function renderSkillDev(c){
@@ -2828,6 +2855,13 @@ function renderSettings(c){
           '<div class="setting-row" style="grid-template-columns:1fr"><label>API Key（可选）</label><input id="cfg-skillhub-key" type="password" placeholder="可选，公开接口通常无需填写"></div>'+
         '</div>'+
       '</div>'+
+      '<div class="setting-card full">'+
+        '<div class="setting-head"><span class="setting-title">GitHub 发布</span></div>'+
+        '<div class="setting-desc">用于「Skill 开发」页一键把生成的 Skill 自动建 GitHub 仓库并提交。填入 GitHub Personal Access Token（需 repo 权限）；留空则使用本机 gh 已登录账号。</div>'+
+        '<div style="display:grid;grid-template-columns:1fr;gap:16px">'+
+          '<div class="setting-row" style="grid-template-columns:1fr"><label>GitHub Token</label><input id="cfg-github-token" type="password" placeholder="ghp_... 需 repo 权限（可选）"></div>'+
+        '</div>'+
+      '</div>'+
     '</div>'+
     '<div class="settings-actions">'+
       '<span class="hint" style="margin:0;align-self:center">LLM 与 SkillHub 配置保存在本地；后端地址仅保存在浏览器本地。</span>'+
@@ -2852,6 +2886,9 @@ function renderSettings(c){
       const sh=d.config.skillhub||{};
       if(shBaseInp)shBaseInp.value=sh.base_url||'https://api.skillhub.cn';
       if(shKeyInp)shKeyInp.value=sh.api_key||'';
+      const gh=d.config.github||{};
+      const ghTokInp=document.getElementById('cfg-github-token');
+      if(ghTokInp)ghTokInp.value=gh.token||'';
     }
     syncLlmCache();
   }).catch(()=>{});
@@ -2865,7 +2902,8 @@ function renderSettings(c){
     }
     apiPost('/api/config',{
       llm:{base_url:baseInp.value.trim(),api_key:keyInp.value.trim(),model:modelInp.value.trim()},
-      skillhub:{base_url:shBaseInp?shBaseInp.value.trim():'https://api.skillhub.cn',api_key:shKeyInp?shKeyInp.value.trim():''}
+      skillhub:{base_url:shBaseInp?shBaseInp.value.trim():'https://api.skillhub.cn',api_key:shKeyInp?shKeyInp.value.trim():''},
+      github:{token:(document.getElementById('cfg-github-token')||{}).value||''}
     }).then(d=>{ if(d.ok) syncLlmCache(); toast(d.ok?'配置已保存':'保存失败：'+(d.error||'')); }).catch(e=>toast('保存失败：'+apiErrorHint(e)));
   };
   document.getElementById('cfg-test').onclick=()=>{

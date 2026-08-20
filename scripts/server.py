@@ -88,6 +88,7 @@ def load_config():
     return {
         "llm": {"base_url": "", "api_key": "", "model": "gpt-4o"},
         "skillhub": {"base_url": "https://api.skillhub.cn", "api_key": ""},
+        "github": {"token": ""},
     }
 
 
@@ -208,6 +209,10 @@ class APIHandler(BaseHTTPRequestHandler):
             return self.handle_skill_install(payload)
         if path == "/api/skill/dismantle":
             return self.handle_skill_dismantle(payload)
+        if path == "/api/skill/git":
+            return self.handle_skill_git(payload)
+        if path == "/api/skill/publish":
+            return self.handle_skill_publish(payload)
         return self._error("Unsupported POST endpoint", 404)
 
     def handle_search(self, payload):
@@ -345,6 +350,8 @@ class APIHandler(BaseHTTPRequestHandler):
         CONFIG["llm"] = payload.get("llm", CONFIG.get("llm", {}))
         if "skillhub" in payload:
             CONFIG["skillhub"] = {**CONFIG.get("skillhub", {}), **payload.get("skillhub", {})}
+        if "github" in payload:
+            CONFIG["github"] = {**CONFIG.get("github", {}), **payload.get("github", {})}
         save_config(CONFIG)
         return self._json({"ok": True})
 
@@ -1041,6 +1048,197 @@ class APIHandler(BaseHTTPRequestHandler):
             })
         except Exception as e:
             return self._error('拆解失败：{0}'.format(e))
+
+    # ── Skill 发布链路：Git 同步 + SkillHub 发布 ──
+    @staticmethod
+    def _slugify(name):
+        s = (name or '').strip().lower()
+        s = re.sub(r'[^a-z0-9]+', '-', s)
+        s = re.sub(r'-+', '-', s).strip('-')
+        return s or 'skill'
+
+    @staticmethod
+    def _extract_frontmatter(text):
+        fm = {}
+        m = re.match(r'^---\s*\n(.*?)\n---', text, re.DOTALL)
+        if not m:
+            return fm
+        for line in m.group(1).splitlines():
+            if ':' in line:
+                k, v = line.split(':', 1)
+                fm[k.strip()] = v.strip()
+        return fm
+
+    def _set_frontmatter_field(self, skill_md, field, value):
+        text = skill_md.read_text(encoding='utf-8')
+        lines = text.split('\n')
+        fm_end = None
+        if lines and lines[0].strip() == '---':
+            for i in range(1, len(lines)):
+                if lines[i].strip() == '---':
+                    fm_end = i
+                    break
+        if fm_end is None:
+            return
+        idx = None
+        for i in range(1, fm_end):
+            if lines[i].split(':', 1)[0].strip() == field:
+                idx = i
+                break
+        new_line = '{0}: {1}'.format(field, value)
+        if idx is not None:
+            lines[idx] = new_line
+        else:
+            lines.insert(fm_end, new_line)
+        skill_md.write_text('\n'.join(lines), encoding='utf-8')
+
+    def _find_gh(self):
+        candidates = [
+            "C:/Users/dillon/.workbuddy/binaries/gh/bin/gh.exe",
+            "gh",
+        ]
+        for c in candidates:
+            p = self._to_native_exe(c)
+            if shutil.which(p) or Path(p).exists():
+                return p
+        return "gh"
+
+    @staticmethod
+    def _to_native_exe(p):
+        # WSL 下把 Windows 风格 exe 路径转 /mnt/c/...
+        if os.name != 'nt' and re.match(r'^[A-Za-z]:\\\\', p):
+            drive = p[0].lower()
+            return '/mnt/' + drive + p[2:].replace('\\', '/')
+        return p
+
+    def _gh_whoami(self, env):
+        try:
+            proc = subprocess.run([self._find_gh(), 'api', 'user', '--jq', '.login'],
+                                   capture_output=True, text=True, timeout=30, env=env)
+            if proc.returncode == 0 and proc.stdout.strip():
+                return proc.stdout.strip()
+        except Exception:
+            pass
+        return 'Dillon-Xue'
+
+    def _run_cmd(self, cmd, cwd, env=None):
+        full_env = dict(os.environ)
+        if env:
+            full_env.update(env)
+        proc = subprocess.run(cmd, cwd=str(cwd), capture_output=True, text=True,
+                              timeout=120, env=full_env)
+        if proc.returncode != 0:
+            msg = (proc.stderr or proc.stdout or '命令失败').strip()
+            raise RuntimeError(msg[-500:])
+        return proc.stdout.strip()
+
+    def handle_skill_git(self, payload):
+        """自动建 GitHub 仓库并同步生成的 Skill 代码（git init + commit + push + 写回 homepage）。"""
+        gid = (payload.get('id') or '').strip()
+        if not gid:
+            return self._error('缺少生成记录 id')
+        gdir = BASE_DIR / 'generations' / gid
+        skill_md = gdir / 'SKILL.md'
+        if not skill_md.exists():
+            return self._error('未找到生成记录：{0}'.format(gid))
+        text = skill_md.read_text(encoding='utf-8')
+        fm = self._extract_frontmatter(text)
+        name = fm.get('name') or gid
+        slug = (payload.get('slug') or self._slugify(name))
+        token = (CONFIG.get('github') or {}).get('token') or ''
+        env = dict(os.environ)
+        if token:
+            env['GH_TOKEN'] = token
+        gh = self._find_gh()
+        owner = self._gh_whoami(env)
+        repo_url = 'https://github.com/{0}/{1}.git'.format(owner, slug)
+        steps = []
+        try:
+            try:
+                self._run_cmd([gh, 'repo', 'create', slug, '--public',
+                               '--description', (fm.get('description') or name)[:200],
+                               '--confirm'], cwd=gdir, env=env)
+                steps.append('已创建 GitHub 仓库 {0}/{1}'.format(owner, slug))
+            except Exception as e:
+                steps.append('创建仓库跳过：{0}（可能已存在）'.format(str(e)[:120]))
+            if not (gdir / '.git').exists():
+                self._run_cmd(['git', 'init'], cwd=gdir)
+            self._run_cmd(['git', 'add', '-A'], cwd=gdir)
+            try:
+                self._run_cmd(['git', 'commit', '-m', 'init: {0}'.format(name)], cwd=gdir)
+            except Exception:
+                steps.append('无新改动需提交')
+            try:
+                self._run_cmd(['git', 'remote', 'get-url', 'origin'], cwd=gdir)
+            except Exception:
+                self._run_cmd(['git', 'remote', 'add', 'origin', repo_url], cwd=gdir)
+            push_url = repo_url
+            if token:
+                push_url = 'https://x-access-token:{0}@github.com/{1}/{2}.git'.format(token, owner, slug)
+            self._run_cmd(['git', 'remote', 'set-url', 'origin', push_url], cwd=gdir)
+            try:
+                self._run_cmd(['git', 'push', '-u', 'origin', 'HEAD'], cwd=gdir)
+            finally:
+                self._run_cmd(['git', 'remote', 'set-url', 'origin', repo_url], cwd=gdir)
+            steps.append('已推送至 {0}'.format(repo_url))
+            # 写回 homepage 并补提交
+            homepage = 'https://github.com/{0}/{1}'.format(owner, slug)
+            try:
+                self._set_frontmatter_field(skill_md, 'homepage', homepage)
+                self._run_cmd(['git', 'add', '-A'], cwd=gdir)
+                self._run_cmd(['git', 'commit', '-m', 'chore: 补充 homepage'], cwd=gdir)
+                self._run_cmd(['git', 'remote', 'set-url', 'origin', push_url], cwd=gdir)
+                try:
+                    self._run_cmd(['git', 'push', 'origin', 'HEAD'], cwd=gdir)
+                finally:
+                    self._run_cmd(['git', 'remote', 'set-url', 'origin', repo_url], cwd=gdir)
+            except Exception:
+                pass
+            return self._json({'ok': True, 'slug': slug, 'owner': owner,
+                               'repo_url': repo_url, 'homepage': homepage, 'steps': steps})
+        except Exception as e:
+            return self._error('Git 同步失败：{0}'.format(e))
+
+    def handle_skill_publish(self, payload):
+        """调用 SkillHub CLI 发布生成的 Skill。"""
+        gid = (payload.get('id') or '').strip()
+        if not gid:
+            return self._error('缺少生成记录 id')
+        gdir = BASE_DIR / 'generations' / gid
+        skill_md = gdir / 'SKILL.md'
+        if not skill_md.exists():
+            return self._error('未找到生成记录：{0}'.format(gid))
+        cfg = CONFIG.get('skillhub') or {}
+        cli = payload.get('cli_path') or cfg.get('cli_path') or 'C:/Users/dillon/.skillhub/skills_store_cli.py'
+        cli = self._to_native_exe(cli)
+        token = payload.get('token') or cfg.get('api_key') or ''
+        if not token:
+            return self._error('缺少 SkillHub Token（请在设置页配置或运行时传入）')
+        version = payload.get('version') or '1.0.0'
+        changelog = payload.get('changelog') or '首次发布'
+        dry = bool(payload.get('dry_run', False))
+        cmd = [sys.executable, cli, 'publish', str(gdir),
+               '--token', token, '--version', version, '--changelog', changelog]
+        if dry:
+            cmd.append('--dry-run')
+        try:
+            proc = subprocess.run(cmd, capture_output=True, text=True, timeout=180)
+            out = (proc.stdout or '') + (proc.stderr or '')
+            if proc.returncode != 0:
+                return self._error('发布失败：' + out.strip()[-800:])
+            verify = ''
+            try:
+                slug = self._extract_frontmatter(skill_md.read_text(encoding='utf-8')).get('slug') or self._slugify(gid)
+                vp = subprocess.run([sys.executable, cli, 'search', slug],
+                                    capture_output=True, text=True, timeout=60)
+                verify = (vp.stdout or vp.stderr or '').strip()[-400:]
+            except Exception:
+                pass
+            return self._json({'ok': True, 'output': out.strip()[-1500:], 'verify': verify})
+        except subprocess.TimeoutExpired:
+            return self._error('发布超时', 504)
+        except Exception as e:
+            return self._error('发布异常：{0}'.format(e))
 
     def handle_workshop_data(self, payload):
         """实时返回零件工坊数据（零件库 + 生成/拆解记录 + 实时引用次数）。
