@@ -1436,7 +1436,7 @@ function drawSk(){
   const tierCls=t=>({低:'',中:'mid',高:'high',危:'high'}[t]||'');
   document.getElementById('sk-body').innerHTML=pageArr.map(s=>`
     <tr>
-      <td><div class="skill-name" data-tooltip='${tooltipAttr({title:s.display_name,desc:s.description||'暂无描述',tags:[s.source||'',`安装 ${s.install_date||'—'}`,`Token ${(s.token||0).toLocaleString()}`,s.size_human||'',s.status||'']})}'><div class="av"></div><div><div class="nm">${esc(s.display_name)}</div><div class="id">${esc(s.id)}</div></div></div></td>
+      <td><div class="skill-name" data-tooltip='${tooltipAttr({title:s.display_name,desc:s.description||'暂无描述',tags:[s.source||'',`安装 ${s.install_date||'—'}`,`Token ${(s.token||0).toLocaleString()}`,s.size_human||'',s.status||'']})}'><div><div class="nm">${esc(s.display_name)}</div><div class="id">${esc(s.id)}</div></div></div></td>
       <td><span class="src-tag">${esc(s.source)}</span></td>
       <td style="font-family:var(--mono);font-size:12px;color:var(--dim)">${s.install_date||'—'}</td>
       <td style="font-family:var(--mono);font-size:12px">${s.days_unused==null?'—':s.days_unused+'天'}</td>
@@ -1538,7 +1538,7 @@ function renderStorage(c){
     <div class="store-grid">${cats.map(cat=>`
       <div class="store-card">
         <span class="safe-tag ${cat.risk}">${cat.risk_label}</span>
-        <div class="sc-top"><div class="sc-ico">${cat.icon}</div><div><div class="sc-nm">${cat.name}</div><div class="sc-fc">${cat.file_count} 文件</div></div></div>
+        <div class="sc-top"><div><div class="sc-nm">${cat.name}</div><div class="sc-fc">${cat.file_count} 文件</div></div></div>
         <div class="sc-sz">${cat.size_human}</div>
         <div class="sc-sub">${sizeH(cat.size_bytes)}</div>
         ${cat.risk==='safe'||cat.risk==='cautious'?`<div class="sc-actions"><button class="clean ${cat.risk==='cautious'?'warn':''}" data-path="${esc(cat.path)}">${cat.risk==='cautious'?' 谨慎清理':' 清理'}</button></div>`:''}
@@ -2147,7 +2147,7 @@ function _renderSkillDev(c){
       else{actionHtml='<button class="btn btn-install" data-job="'+esc(g.id||'')+'">安装</button>';}
     }
     return '<tr data-job="'+esc(g.id||'')+'">'+
-      '<td><div class="skill-name"><span class="av" style="font-size:12px"></span><div><div class="nm">'+esc(g.name)+'</div><div class="id">'+esc(idStr)+'</div></div></div></td>'+
+      '<td><div class="skill-name"><div><div class="nm">'+esc(g.name)+'</div><div class="id">'+esc(idStr)+'</div></div></div></td>'+
       '<td><div class="lt-desc" title="'+esc(desc)+'">'+esc(descShort||'—')+'</div></td>'+
       '<td><span class="lt-tag '+statusClass+'">'+statusLabel+'</span></td>'+
       '<td>'+esc(g.created_at||'')+'</td>'+
@@ -2246,7 +2246,7 @@ function _renderDismantle(c){
     const desc=g.description||'';
     const descShort=desc.length>40?desc.slice(0,40)+'…':desc;
     return '<tr data-dsm="'+esc(g.id||'')+'">'+
-      '<td><div class="skill-name"><span class="av" style="font-size:12px"></span><div><div class="nm">'+esc(g.name)+'</div><div class="id">'+esc(idStr)+'</div></div></div></td>'+
+      '<td><div class="skill-name"><div><div class="nm">'+esc(g.name)+'</div><div class="id">'+esc(idStr)+'</div></div></div></td>'+
       '<td><div class="lt-desc" title="'+esc(desc)+'">'+esc(descShort||'—')+'</div></td>'+
       '<td>'+esc(g.created_at||'')+'</td>'+
       '<td><span class="lt-tag '+statusClass+'">'+statusLabel+'</span></td>'+
