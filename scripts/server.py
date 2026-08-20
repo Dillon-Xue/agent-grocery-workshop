@@ -1105,10 +1105,11 @@ class APIHandler(BaseHTTPRequestHandler):
 
     @staticmethod
     def _to_native_exe(p):
-        # WSL 下把 Windows 风格 exe 路径转 /mnt/c/...
-        if os.name != 'nt' and re.match(r'^[A-Za-z]:\\\\', p):
+        # WSL 下把 Windows 风格 exe 路径（C:/... 或 C:\...）转 /mnt/c/...
+        if os.name != 'nt' and len(p) >= 2 and p[0].isalpha() and p[1] == ':':
             drive = p[0].lower()
-            return '/mnt/' + drive + p[2:].replace('\\', '/')
+            rest = p[2:].replace(chr(92), '/')
+            return '/mnt/' + drive + rest
         return p
 
     def _gh_whoami(self, env):
@@ -1200,7 +1201,7 @@ class APIHandler(BaseHTTPRequestHandler):
             return self._error('Git 同步失败：{0}'.format(e))
 
     def handle_skill_publish(self, payload):
-        """调用 SkillHub CLI 发布生成的 Skill。"""
+        """调用 SkillHub CLI 发布生成的 Skill（自动补齐 frontmatter / 读取本地凭据）。"""
         gid = (payload.get('id') or '').strip()
         if not gid:
             return self._error('缺少生成记录 id')
@@ -1208,12 +1209,21 @@ class APIHandler(BaseHTTPRequestHandler):
         skill_md = gdir / 'SKILL.md'
         if not skill_md.exists():
             return self._error('未找到生成记录：{0}'.format(gid))
+        # 发布前自动补齐 SkillHub 必需的 frontmatter 字段（slug/displayName/version），
+        # 否则生成的 SKILL.md 缺字段会令 CLI 校验失败。
+        try:
+            self._ensure_publish_frontmatter(skill_md)
+        except Exception as e:
+            return self._error('规范化 SKILL.md 失败：{0}'.format(e))
         cfg = CONFIG.get('skillhub') or {}
         cli = payload.get('cli_path') or cfg.get('cli_path') or 'C:/Users/dillon/.skillhub/skills_store_cli.py'
         cli = self._to_native_exe(cli)
-        token = payload.get('token') or cfg.get('api_key') or ''
+        token = (payload.get('token')
+                 or (CONFIG.get('skillhub') or {}).get('api_key')
+                 or self._read_skillhub_pat()
+                 or '')
         if not token:
-            return self._error('缺少 SkillHub Token（请在设置页配置或运行时传入）')
+            return self._error('缺少 SkillHub Token（请先在 SkillHub 登录，或在设置页配置 api_key）')
         version = payload.get('version') or '1.0.0'
         changelog = payload.get('changelog') or '首次发布'
         dry = bool(payload.get('dry_run', False))
@@ -1239,6 +1249,84 @@ class APIHandler(BaseHTTPRequestHandler):
             return self._error('发布超时', 504)
         except Exception as e:
             return self._error('发布异常：{0}'.format(e))
+
+    @staticmethod
+    def _read_skillhub_pat():
+        """读取 SkillHub 本地已登录凭据（PAT），用于发布鉴权。
+
+        凭据位于 Windows 用户目录 ~/.workbuddy/skillhub-stats/credentials.json 的 pat 字段。
+        兼容 server 跑在 Windows 原生或 WSL 两种情况（WSL 下经 USERPROFILE / 挂载盘访问）。
+        """
+        cands = []
+        try:
+            cands.append(Path.home() / ".workbuddy" / "skillhub-stats" / "credentials.json")
+        except Exception:
+            pass
+        up = os.environ.get("USERPROFILE")
+        if up:
+            cands.append(Path(up) / ".workbuddy" / "skillhub-stats" / "credentials.json")
+        if os.name != "nt":
+            cands.append(Path("/mnt/c/Users/dillon/.workbuddy/skillhub-stats/credentials.json"))
+        seen = set()
+        for c in cands:
+            try:
+                c = Path(c)
+                key = str(c)
+                if key in seen:
+                    continue
+                seen.add(key)
+                if c.exists():
+                    d = json.loads(c.read_text(encoding="utf-8"))
+                    pat = (d.get("pat") or "").strip()
+                    if pat:
+                        return pat
+            except Exception:
+                pass
+        return ""
+
+    def _ensure_publish_frontmatter(self, skill_md):
+        """发布前规范化 SKILL.md frontmatter，补齐 SkillHub CLI 必需的 slug/displayName/version。
+
+        无论 SKILL.md 是默认模板还是 LLM 生成（格式可能不标准），都重写为规范形式，
+        保留原有其它字段（如 homepage/license），确保 CLI 的 _validate_metadata 通过。
+        """
+        nl = chr(10)
+        text = skill_md.read_text(encoding='utf-8')
+        fm = self._extract_frontmatter(text)
+        name = (fm.get('name') or '').strip() or skill_md.parent.name
+        slug = (fm.get('slug') or '').strip()
+        # slug 必须是 kebab-case 且长度>=2；缺失时用 name 派生（中文 name 无 ASCII 会清空，
+        # 回退为 skill-<随机hex>，保证全局唯一、合法，避免 SkillHub slug 冲突导致发布失败）。
+        if not re.match(r'^[a-z0-9]+(?:-[a-z0-9]+)*$', slug or ''):
+            base = re.sub(r'[^a-z0-9]+', '-', (name or '').lower()).strip('-')
+            slug = base if len(base) >= 2 else ('skill-' + uuid.uuid4().hex[:8])
+        display = (fm.get('displayName') or '').strip() or name
+        version = (fm.get('version') or '').strip() or '1.0.0'
+        merged = dict(fm)
+        merged['name'] = name
+        merged['slug'] = slug
+        merged['displayName'] = display
+        merged['version'] = version
+        merged['description'] = (fm.get('description') or '').strip()
+        merged['tags'] = fm.get('tags') or ''
+        merged['agent_created'] = True
+        order = ['name', 'slug', 'displayName', 'version', 'description', 'tags', 'agent_created']
+        lines = ['---']
+        for k in order:
+            lines.append(k + ': ' + str(merged.get(k, '')))
+        for k, v in merged.items():
+            if k not in order:
+                lines.append(k + ': ' + str(v))
+        lines.append('---')
+        new_fm = nl.join(lines) + nl
+        body = text
+        if text.startswith('---'):
+            end = text.find(nl + '---', 3)
+            if end != -1:
+                nxt = text.find(nl, end + 4)
+                body = text[nxt + 1:] if nxt != -1 else ''
+        skill_md.write_text(new_fm + body, encoding='utf-8')
+        return slug
 
     def handle_workshop_data(self, payload):
         """实时返回零件工坊数据（零件库 + 生成/拆解记录 + 实时引用次数）。
