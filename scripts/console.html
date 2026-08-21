@@ -1502,7 +1502,7 @@ function deleteSkill(s){
 }
 function drawSk(){
   let arr=DATA.skills.filter(s=>{
-    if(skFilter==='danger'&&s.status_color!=='danger')return false;
+    if(skFilter==='danger'&&s.status_color!=='danger'&&!(/高|危/.test(s.security_tier||'')))return false;
     if(skFilter==='risk'&&!(s.security_tier==='高'||s.security_tier==='危'))return false;
     if(skQuery){const q=skQuery.toLowerCase();const hay=(s.display_name+' '+s.id+' '+s.source+' '+s.security_tier+' '+((s.security_findings||[]).map(f=>f.note).join(' ')||'')).toLowerCase();if(!hay.includes(q) && !(s.description||'').toLowerCase().includes(q))return false;}
     return true;
