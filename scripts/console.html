@@ -2125,6 +2125,7 @@ function _installGeneratedFromDrawer(){
 }
 function _gitSyncGenerated(id,btn){
   if(!id){toast('请先生成 Skill');return;}
+  if(!CFG.github.token){toast('请先在「设置 → GitHub 发布」配置 GitHub Token，才能提交到 Git');switchTab('settings');return;}
   if(btn){btn.disabled=true;btn.textContent='提交中…';}
   apiPost('/api/skill/git',{id:id}).then(d=>{
     if(btn){btn.disabled=false;btn.textContent='提交 Git';}
@@ -2134,6 +2135,7 @@ function _gitSyncGenerated(id,btn){
 }
 function _publishGenerated(id,btn){
   if(!id){toast('请先生成 Skill');return;}
+  if(!CFG.skillhub.api_key){toast('请先在「设置 → SkillHub」配置 API Key，才能发布到 SkillHub');switchTab('settings');return;}
   if(btn){btn.disabled=true;btn.textContent='发布中…';}
   apiPost('/api/skill/publish',{id:id}).then(d=>{
     if(btn){btn.disabled=false;btn.textContent='发布 SkillHub';}
@@ -2421,6 +2423,7 @@ function _runDismantle(id, btn){
 const CHAT_STORE_KEY='wb_chat_sessions_v1';
 let chatSkill=null, chatMessages=[];
 let LLM_CFG={base_url:'',api_key:'',model:''};
+let CFG={github:{token:''},skillhub:{api_key:''}};  // 缓存 git/skillhub 配置状态，供按钮门禁判断
 function fmtChatTime(iso){try{const d=new Date(iso);return d.toLocaleString('zh-CN',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'});}catch(e){return iso||'';}}
 function readChatStore(){try{return JSON.parse(localStorage.getItem(CHAT_STORE_KEY)||'{}');}catch(e){return {};}}
 function writeChatStore(store){localStorage.setItem(CHAT_STORE_KEY,JSON.stringify(store));}
@@ -2889,6 +2892,7 @@ function renderSettings(c){
       const gh=d.config.github||{};
       const ghTokInp=document.getElementById('cfg-github-token');
       if(ghTokInp)ghTokInp.value=gh.token||'';
+      CFG.github={token:gh.token||''};CFG.skillhub={api_key:sh.api_key||''};
     }
     syncLlmCache();
   }).catch(()=>{});
@@ -2904,7 +2908,7 @@ function renderSettings(c){
       llm:{base_url:baseInp.value.trim(),api_key:keyInp.value.trim(),model:modelInp.value.trim()},
       skillhub:{base_url:shBaseInp?shBaseInp.value.trim():'https://api.skillhub.cn',api_key:shKeyInp?shKeyInp.value.trim():''},
       github:{token:(document.getElementById('cfg-github-token')||{}).value||''}
-    }).then(d=>{ if(d.ok) syncLlmCache(); toast(d.ok?'配置已保存':'保存失败：'+(d.error||'')); }).catch(e=>toast('保存失败：'+apiErrorHint(e)));
+    }).then(d=>{ if(d.ok){ syncLlmCache(); const shKey=(shKeyInp?shKeyInp.value.trim():''); CFG.skillhub={api_key:shKey}; CFG.github={token:(document.getElementById('cfg-github-token')||{}).value||''}; } toast(d.ok?'配置已保存':'保存失败：'+(d.error||'')); }).catch(e=>toast('保存失败：'+apiErrorHint(e)));
   };
   document.getElementById('cfg-test').onclick=()=>{
     apiPost('/api/chat',{base_url:baseInp.value.trim(),api_key:keyInp.value.trim(),model:modelInp.value.trim(),messages:[{role:'user',content:'hi'}]})
@@ -2970,6 +2974,8 @@ function init(data){
   window.addEventListener('hashchange',()=>{const t=location.hash.slice(1);if(t!==currentTab&&TAB_META[t])switchTab(t);});
   // 首次布局可能arena尺寸为0，延迟重试保证平铺
   scheduleCapsuleLayout();
+  // 启动即拉取配置填充 CFG 缓存（按钮门禁判断，避免未开设置页就误判未配置）
+  fetch(apiUrl('/api/config')).then(r=>r.json()).then(d=>{ if(d.ok&&d.config){ const sh=d.config.skillhub||{}; const gh=d.config.github||{}; CFG.skillhub={api_key:sh.api_key||''}; CFG.github={token:gh.token||''}; } }).catch(()=>{});
 }
 fetch('console_data.json').then(r=>r.json()).then(init).catch(e=>{
   if (EMBEDDED_DATA) { init(EMBEDDED_DATA); return; }

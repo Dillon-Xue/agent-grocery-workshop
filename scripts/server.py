@@ -99,6 +99,24 @@ def save_config(cfg):
 CONFIG = load_config()
 
 
+def _win_user_path(subpath):
+    """返回 Windows 用户目录下的工具路径，兼容 server 跑在 Windows 原生与 WSL 两种环境，且不硬编码用户名。
+
+    - Windows 原生（os.name=='nt'）：直接用当前用户 home（C:\\Users\\<用户>）。
+    - WSL：CLI/gh 通常装在 Windows 侧，探测 /mnt/c/Users/* 找到实际用户目录。
+    - 兜底：当前用户 home（纯 Linux 场景）。
+    """
+    if os.name == 'nt':
+        return os.path.expanduser(os.path.join('~', subpath))
+    base = '/mnt/c/Users'
+    if os.path.isdir(base):
+        for name in os.listdir(base):
+            cand = os.path.join(base, name, *subpath.split('/'))
+            if os.path.exists(cand):
+                return cand
+    return os.path.expanduser(os.path.join('~', subpath))
+
+
 class APIHandler(BaseHTTPRequestHandler):
     def log_message(self, fmt, *args):
         # 记录到文件日志，便于排查「错误日志看不到」问题
@@ -135,7 +153,7 @@ class APIHandler(BaseHTTPRequestHandler):
         if path == "/console_data.json":
             path = "/scripts/console_data.json"
         if path == "/api/config":
-            return self._json({"ok": True, "config": {**CONFIG.get("llm", {}), "skillhub": CONFIG.get("skillhub", {})}})
+            return self._json({"ok": True, "config": {"llm": CONFIG.get("llm", {}), "skillhub": CONFIG.get("skillhub", {}), "github": CONFIG.get("github", {})}})
         if path == "/api/workshop":
             return self.handle_workshop_data({})
         if path.startswith("/api/"):
@@ -1094,7 +1112,7 @@ class APIHandler(BaseHTTPRequestHandler):
 
     def _find_gh(self):
         candidates = [
-            "C:/Users/dillon/.workbuddy/binaries/gh/bin/gh.exe",
+            _win_user_path('.workbuddy/binaries/gh/bin/gh.exe'),
             "gh",
         ]
         for c in candidates:
@@ -1147,6 +1165,8 @@ class APIHandler(BaseHTTPRequestHandler):
         name = fm.get('name') or gid
         slug = (payload.get('slug') or self._slugify(name))
         token = (CONFIG.get('github') or {}).get('token') or ''
+        if not token:
+            return self._error('请先在「设置 → GitHub 发布」配置 GitHub Token 后再提交 Git（未配置无法同步到 Git）')
         env = dict(os.environ)
         if token:
             env['GH_TOKEN'] = token
@@ -1216,14 +1236,13 @@ class APIHandler(BaseHTTPRequestHandler):
         except Exception as e:
             return self._error('规范化 SKILL.md 失败：{0}'.format(e))
         cfg = CONFIG.get('skillhub') or {}
-        cli = payload.get('cli_path') or cfg.get('cli_path') or 'C:/Users/dillon/.skillhub/skills_store_cli.py'
+        cli = payload.get('cli_path') or cfg.get('cli_path') or _win_user_path('.skillhub/skills_store_cli.py')
         cli = self._to_native_exe(cli)
         token = (payload.get('token')
                  or (CONFIG.get('skillhub') or {}).get('api_key')
-                 or self._read_skillhub_pat()
                  or '')
         if not token:
-            return self._error('缺少 SkillHub Token（请先在 SkillHub 登录，或在设置页配置 api_key）')
+            return self._error('请先在「设置 → SkillHub」配置 API Key 后再发布（未配置 SkillHub 无法发布）')
         version = payload.get('version') or '1.0.0'
         changelog = payload.get('changelog') or '首次发布'
         dry = bool(payload.get('dry_run', False))
@@ -1250,39 +1269,6 @@ class APIHandler(BaseHTTPRequestHandler):
         except Exception as e:
             return self._error('发布异常：{0}'.format(e))
 
-    @staticmethod
-    def _read_skillhub_pat():
-        """读取 SkillHub 本地已登录凭据（PAT），用于发布鉴权。
-
-        凭据位于 Windows 用户目录 ~/.workbuddy/skillhub-stats/credentials.json 的 pat 字段。
-        兼容 server 跑在 Windows 原生或 WSL 两种情况（WSL 下经 USERPROFILE / 挂载盘访问）。
-        """
-        cands = []
-        try:
-            cands.append(Path.home() / ".workbuddy" / "skillhub-stats" / "credentials.json")
-        except Exception:
-            pass
-        up = os.environ.get("USERPROFILE")
-        if up:
-            cands.append(Path(up) / ".workbuddy" / "skillhub-stats" / "credentials.json")
-        if os.name != "nt":
-            cands.append(Path("/mnt/c/Users/dillon/.workbuddy/skillhub-stats/credentials.json"))
-        seen = set()
-        for c in cands:
-            try:
-                c = Path(c)
-                key = str(c)
-                if key in seen:
-                    continue
-                seen.add(key)
-                if c.exists():
-                    d = json.loads(c.read_text(encoding="utf-8"))
-                    pat = (d.get("pat") or "").strip()
-                    if pat:
-                        return pat
-            except Exception:
-                pass
-        return ""
 
     def _ensure_publish_frontmatter(self, skill_md):
         """发布前规范化 SKILL.md frontmatter，补齐 SkillHub CLI 必需的 slug/displayName/version。
