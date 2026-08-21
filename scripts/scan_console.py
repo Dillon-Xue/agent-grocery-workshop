@@ -11,12 +11,14 @@ import os
 import re
 import sys
 import shutil
+import subprocess
 import argparse
 from datetime import datetime, timedelta
 from collections import defaultdict
 import glob
 import platform
 from pathlib import Path
+from concurrent.futures import ThreadPoolExecutor
 
 # Windows 终端默认 GBK，无法直接打印 emoji；重配 stdout 为 utf-8，避免启动脚本时报错。
 if sys.platform == "win32":
@@ -434,6 +436,13 @@ def merge_usage(skills, usage):
                 s['days_unused'] = (today - ld).days
             except:
                 pass
+        # 没有使用记录时，用安装时间兜底，保证「未用时长」列始终有值
+        if s['days_unused'] is None and s.get('install_date'):
+            try:
+                ld = datetime.strptime(s['install_date'], '%Y-%m-%d').date()
+                s['days_unused'] = (today - ld).days
+            except:
+                pass
 
         # 两轨判定
         if s.get('days_unused') is not None:
@@ -477,6 +486,51 @@ def scan_storage():
             sz, cnt = 0, 0
         cats.append({**c, "size_bytes": sz, "size_human": size_human(sz), "file_count": cnt})
 
+        if c["risk"] == "safe": safe_b += sz
+        elif c["risk"] == "cautious": cautious_b += sz
+        elif c["risk"] == "skill": skill_b += sz
+        else: never_b += sz
+
+    return cats, {
+        "safe_total": size_human(safe_b), "safe_bytes": safe_b,
+        "cautious_total": size_human(cautious_b), "cautious_bytes": cautious_b,
+        "skill_total": size_human(skill_b), "skill_bytes": skill_b,
+        "never_total": size_human(never_b), "never_bytes": never_b,
+    }
+
+
+def _scan_one_category(path, timeout_per_cat=50):
+    """扫描单个分类：返回 (size_bytes, file_count)。"""
+    sz = cnt = 0
+    if os.path.isdir(path):
+        try:
+            r = subprocess.run(["du", "-sb", path], capture_output=True, text=True, timeout=timeout_per_cat)
+            if r.returncode == 0:
+                sz = int(r.stdout.split()[0])
+        except Exception:
+            pass
+        try:
+            r = subprocess.run(
+                ["sh", "-c", 'find "$1" -type f 2>/dev/null | wc -l', "_", path],
+                capture_output=True, text=True, timeout=timeout_per_cat
+            )
+            if r.returncode == 0:
+                cnt = int(r.stdout.strip() or 0)
+        except Exception:
+            pass
+    return sz, cnt
+
+
+def scan_storage_live(timeout_per_cat=50):
+    """实时存储扫描：用 du + find 并行快速获取各分类大小与文件数。"""
+    paths = [c["path"] for c in STORAGE_CATEGORIES]
+    with ThreadPoolExecutor(max_workers=8) as ex:
+        results = list(ex.map(lambda p: _scan_one_category(p, timeout_per_cat), paths))
+
+    cats = []
+    safe_b = cautious_b = skill_b = never_b = 0
+    for c, (sz, cnt) in zip(STORAGE_CATEGORIES, results):
+        cats.append({**c, "size_bytes": sz, "size_human": size_human(sz), "file_count": cnt})
         if c["risk"] == "safe": safe_b += sz
         elif c["risk"] == "cautious": cautious_b += sz
         elif c["risk"] == "skill": skill_b += sz

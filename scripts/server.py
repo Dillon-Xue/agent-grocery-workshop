@@ -15,7 +15,7 @@ import urllib.error
 import urllib.request
 import uuid
 from datetime import datetime
-from http.server import BaseHTTPRequestHandler, HTTPServer
+from http.server import BaseHTTPRequestHandler, HTTPServer, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
@@ -38,6 +38,68 @@ logger = logging.getLogger("agent-grocery-workshop")
 from dismantle import parse_skill_to_candidates
 from scan_console import scan_workshop as scan_workshop_live
 import scan_console
+from scan_console import scan_skills, load_usage, merge_usage, scan_storage_live, size_human
+
+# ── 运行时缓存 ──
+STORAGE_CACHE = None
+STORAGE_SCANNING = False
+STORAGE_LOCK = threading.Lock()
+SKILLS_CACHE = None
+SKILLS_SCANNING = False
+SKILLS_LOCK = threading.Lock()
+
+
+def _empty_storage():
+    return {
+        "categories": [{**c, "size_bytes": 0, "size_human": "0 B", "file_count": 0} for c in scan_console.STORAGE_CATEGORIES],
+        "summary": {
+            "safe_total": "0 B", "safe_bytes": 0,
+            "cautious_total": "0 B", "cautious_bytes": 0,
+            "skill_total": "0 B", "skill_bytes": 0,
+            "never_total": "0 B", "never_bytes": 0,
+        },
+    }
+
+
+def refresh_storage_cache():
+    """后台刷新存储缓存。"""
+    global STORAGE_CACHE, STORAGE_SCANNING
+    with STORAGE_LOCK:
+        if STORAGE_SCANNING:
+            return
+        STORAGE_SCANNING = True
+    try:
+        cats, summary = scan_storage_live()
+        with STORAGE_LOCK:
+            STORAGE_CACHE = {"categories": cats, "summary": summary, "_fresh": True}
+        logger.info("存储缓存已刷新: %s", summary.get("safe_total", "?"))
+    except Exception as e:
+        logger.error("存储缓存刷新失败: %s", e)
+    finally:
+        with STORAGE_LOCK:
+            STORAGE_SCANNING = False
+
+
+def refresh_skills_cache():
+    """后台刷新 Skill 缓存。"""
+    global SKILLS_CACHE, SKILLS_SCANNING
+    with SKILLS_LOCK:
+        if SKILLS_SCANNING:
+            return
+        SKILLS_SCANNING = True
+    try:
+        skills = scan_skills()
+        usage = load_usage()
+        merge_usage(skills, usage)
+        with SKILLS_LOCK:
+            SKILLS_CACHE = skills
+        logger.info("Skill 缓存已刷新: %d 个", len(skills))
+    except Exception as e:
+        logger.error("Skill 缓存刷新失败: %s", e)
+    finally:
+        with SKILLS_LOCK:
+            SKILLS_SCANNING = False
+
 
 # ── 配置 ──
 def detect_workbuddy_home():
@@ -245,6 +307,10 @@ class APIHandler(BaseHTTPRequestHandler):
             return self.handle_skill_generations(payload)
         if path == "/api/workshop":
             return self.handle_workshop_data(payload)
+        if path == "/api/skills":
+            return self.handle_skills_refresh(payload)
+        if path == "/api/storage":
+            return self.handle_storage_refresh(payload)
         if path == "/api/skill/install":
             return self.handle_skill_install(payload)
         if path == "/api/skill/dismantle":
@@ -1366,6 +1432,30 @@ class APIHandler(BaseHTTPRequestHandler):
         except Exception as e:
             return self._error('读取工坊数据失败：' + str(e))
 
+    def handle_skills_refresh(self, payload):
+        """完整扫描已装 Skill（token + 安全 + 使用记录），优先返回缓存，无缓存则后台扫描。"""
+        global SKILLS_CACHE, SKILLS_SCANNING
+        with SKILLS_LOCK:
+            cache = SKILLS_CACHE
+            scanning = SKILLS_SCANNING
+        if cache is not None:
+            return self._json({'ok': True, 'skills': cache, 'fresh': True})
+        if not scanning:
+            threading.Thread(target=refresh_skills_cache, daemon=True).start()
+        return self._json({'ok': True, 'skills': [], 'fresh': False, 'scanning': True})
+
+    def handle_storage_refresh(self, payload):
+        """存储扫描，优先返回缓存，无缓存则触发后台扫描。"""
+        global STORAGE_CACHE, STORAGE_SCANNING
+        with STORAGE_LOCK:
+            cache = STORAGE_CACHE
+            scanning = STORAGE_SCANNING
+        if cache is not None:
+            return self._json({'ok': True, 'storage': cache, 'fresh': True})
+        if not scanning:
+            threading.Thread(target=refresh_storage_cache, daemon=True).start()
+        return self._json({'ok': True, 'storage': _empty_storage(), 'fresh': False, 'scanning': True})
+
 # ── 回收站 / 安全工具（模块级）──
 CONVERSATIONS_DIR = WORKBUDDY_ROOT / "projects"
 
@@ -1572,8 +1662,11 @@ def run(port=8080):
         logger.info(f"启动时已刷新 console_data.json（快速模式）:\n{buf.getvalue()[:500]}")
     except Exception as e:
         logger.error(f"启动时刷新 console_data.json 失败: {e}\n{traceback.format_exc()}")
+    # 启动后在后台预刷新 Skill / 存储缓存，避免前端首次加载长时间等待
+    threading.Thread(target=refresh_skills_cache, daemon=True).start()
+    threading.Thread(target=refresh_storage_cache, daemon=True).start()
     print(f"WorkBuddy Console Server: http://0.0.0.0:{port}")
-    HTTPServer(("0.0.0.0", port), APIHandler).serve_forever()
+    ThreadingHTTPServer(("0.0.0.0", port), APIHandler).serve_forever()
 
 
 if __name__ == "__main__":
