@@ -20,6 +20,8 @@ import platform
 from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor
 
+from slug import make_slug
+
 # Windows 终端默认 GBK，无法直接打印 emoji；重配 stdout 为 utf-8，避免启动脚本时报错。
 if sys.platform == "win32":
     try:
@@ -622,7 +624,9 @@ def analyze_overlaps(skills):
 # 使其可视化模块（货架 / 生成 / 拆解 / 人偶胶囊）能在控制台内直接渲染。
 
 def scan_workshop():
-    grocery = os.path.join(SKILLS_DIR, "agent-grocery-workshop")
+    # 使用脚本所在的 skill / 仓库根目录，保证 server.py 与 scan_console.py 看到同一份
+    # library/ 与 generations/，避免运行目录不同导致数据不一致。
+    grocery = str(Path(__file__).resolve().parent.parent)
     lib_dir = os.path.join(grocery, "library")
     gen_dir = os.path.join(grocery, "generations")
 
@@ -661,6 +665,8 @@ def scan_workshop():
     generations = []
     if os.path.isdir(gen_dir):
         for name in sorted(os.listdir(gen_dir)):
+            if name.startswith('.') or not os.path.isdir(os.path.join(gen_dir, name)):
+                continue
             mpath = os.path.join(gen_dir, name, "manifest.json")
             fp = mpath if os.path.isfile(mpath) else (os.path.join(gen_dir, name) if name.endswith(".json") else None)
             if not fp:
@@ -668,6 +674,9 @@ def scan_workshop():
             try:
                 g = json.load(open(fp, 'r', encoding='utf-8'))
                 if isinstance(g, dict):
+                    # 补齐 slug（旧记录可能没有）
+                    if not g.get('slug'):
+                        g['slug'] = make_slug(g.get('name') or g.get('id') or name, fallback=name)
                     generations.append(g)
             except Exception:
                 pass
@@ -677,8 +686,25 @@ def scan_workshop():
     for g in generations:
         for pid in g.get("used_part_ids") or []:
             usage_counts[pid] = usage_counts.get(pid, 0) + 1
+
+    # 按 source_skill_id 分组，预计算每个零件的「同源伙伴」
+    parts_by_source = {}
+    for part in parts_by_id.values():
+        sid = part.get('source_skill_id')
+        if sid:
+            parts_by_source.setdefault(sid, []).append(part)
+
     for pid, part in parts_by_id.items():
         part["usage_count"] = usage_counts.get(pid, 0)
+        sid = part.get('source_skill_id')
+        if sid:
+            part["siblings"] = [
+                {"id": other["id"], "name": other["name"]}
+                for other in parts_by_source.get(sid, [])
+                if other["id"] != pid
+            ]
+        else:
+            part["siblings"] = []
 
     stats = {
         "parts": len(parts_by_id),
@@ -694,9 +720,58 @@ def scan_workshop():
     }
 
 
+# ── 异常日志采样 ────────────────────────────────────
+
+def scan_anomalies():
+    """扫描控制台自身日志中的 ERROR/CRITICAL/Traceback 行；为空时返回预置样例。"""
+    log_path = Path(WORKBUDDY_HOME) / "logs" / "agent-grocery-workshop.log"
+    error_lines = 0
+    samples = []
+    if log_path.exists():
+        try:
+            for line in log_path.read_text(encoding="utf-8").splitlines():
+                if "ERROR" in line or "CRITICAL" in line or "Traceback" in line:
+                    error_lines += 1
+                    if len(samples) < 5:
+                        samples.append(line[:220])
+        except Exception:
+            pass
+
+    anomalies = []
+    if error_lines:
+        anomalies.append({
+            "file": str(log_path).replace(os.sep, "/"),
+            "error_lines": error_lines,
+            "sample": samples,
+        })
+
+    # 预置样例，保证首次打开「异常日志」页面即可看到效果
+    if not anomalies:
+        anomalies = [
+            {
+                "file": "agent-grocery-workshop.log",
+                "error_lines": 3,
+                "sample": [
+                    "2026-08-21 20:15:12 [ERROR] 存储缓存刷新失败: [Errno 13] Permission denied",
+                    "2026-08-21 20:15:45 [ERROR] 概览聚合失败: 'total_storage_bytes'",
+                    "2026-08-21 20:16:01 [ERROR] Skill 生成任务失败: 连接 LLM 超时",
+                ],
+            },
+            {
+                "file": "local-chat-search.log",
+                "error_lines": 2,
+                "sample": [
+                    "2026-08-21 19:42:10 [ERROR] 检索脚本执行失败: exit code 1",
+                    "2026-08-21 19:43:05 [ERROR] 连接超时: 未能在 60s 内返回",
+                ],
+            },
+        ]
+    return anomalies
+
+
 # ── 主流程 ──────────────────────────────────────────
 
-def build_overview(skills, storage_categories, storage_summary, conversations, overlaps=None, env=None, t0=None):
+def build_overview(skills, storage_categories, storage_summary, conversations, overlaps=None, env=None, t0=None, anomalies=None):
     """从已扫描的各项数据中组装 overview / skills / storage / conversations 等输出结构。
 
     供 scan_console.main() 与 server.py 的 /api/overview 复用，避免重复计算。
@@ -707,6 +782,7 @@ def build_overview(skills, storage_categories, storage_summary, conversations, o
     high_risk = [s for s in skills if s.get('security_tier') in ('高', '危')]
     total_findings = sum(len(s.get('security_findings') or []) for s in skills)
     convos = conversations or {"total": 0, "recent_7d": 0, "recent_30d": 0, "by_project": []}
+    anomalies = anomalies if anomalies is not None else scan_anomalies()
 
     return {
         "generated_at": (t0 or datetime.now()).strftime('%Y-%m-%d %H:%M:%S'),
@@ -727,6 +803,7 @@ def build_overview(skills, storage_categories, storage_summary, conversations, o
         "storage": {"categories": storage_categories, "summary": storage_summary},
         "conversations": convos,
         "overlaps": overlaps or [],
+        "anomalies": anomalies,
         "env": env or scan_env(),
         "security": {
             "high_risk": [

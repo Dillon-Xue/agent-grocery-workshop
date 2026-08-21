@@ -42,6 +42,7 @@ from scan_console import (
     scan_skills, load_usage, merge_usage, scan_storage_live, size_human,
     build_overview, scan_conversations,
 )
+from slug import make_slug
 
 # ── 运行时缓存 ──
 STORAGE_CACHE = None
@@ -1138,7 +1139,12 @@ class APIHandler(BaseHTTPRequestHandler):
             return self._error(str(e))
 
     def handle_skill_dismantle(self, payload):
-        """对 generations/<id>/SKILL.md 执行拆解：识别候选零件、写回 library/（需求1）、记录 manifest。"""
+        """对 generations/<id>/SKILL.md 执行拆解：识别候选零件、写回 library/（需求1）、记录 manifest。
+
+        状态机：待拆解(pending) → 拆解中(dismantling) → 拆解完成(done) / 失败(error)。
+        先立即落盘 dismantling 并返回，真正拆解在后台线程完成，避免请求阻塞、并保证「拆解中」
+        状态对前端可见（需求2）。
+        """
         gid = (payload.get('id') or '').strip()
         if not gid:
             return self._error('缺少生成记录 id')
@@ -1147,52 +1153,83 @@ class APIHandler(BaseHTTPRequestHandler):
         manifest = gdir / 'manifest.json'
         if not skill_md.exists():
             return self._error('未找到生成记录：{0}'.format(gid))
+
+        # 立即标记「拆解中」并落盘，使列表中可见（需求2·问题1）
         try:
-            ws = Workshop(str(BASE_DIR))
-            candidates = parse_skill_to_candidates(str(skill_md))
-            # 将候选零件写回零件库 library/，使其在「组件管理」货架中实时可见（需求1）
-            saved_parts = []
-            for i, c in enumerate(candidates):
-                pid = 'part_dm_{0}_{1:03d}'.format(gid, i)
-                part = {
-                    'id': pid,
-                    'name': c.get('name') or '候选零件 {0}'.format(i + 1),
-                    'category': c.get('category') or '参考文档',
-                    'sub_category': c.get('sub_category') or gid,
-                    'type': c.get('type') or '流程规范',
-                    'description': c.get('description') or '',
-                    'content': c.get('content') or '',
-                    'content_format': c.get('content_format') or 'markdown',
-                    'source_type': 'dismantled',
-                    'source_skill_name': c.get('source_skill_name') or gid,
-                    'metadata': dict(c.get('metadata') or {}),
-                    'version': 'v1.0',
-                    'depends_on': [],
-                    'conflicts_with': [],
-                }
-                try:
-                    ws.add_part(part)
-                    saved_parts.append(pid)
-                except Exception:
-                    pass
-            now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
             manifest_obj = {}
             if manifest.exists():
                 try:
                     manifest_obj = json.loads(manifest.read_text(encoding='utf-8'))
                 except Exception:
                     manifest_obj = {}
-            manifest_obj['auto_dismantled'] = True
-            manifest_obj['dismantled_at'] = now
-            manifest_obj['dismantle_candidates'] = candidates
-            manifest_obj['dismantle_saved_part_ids'] = saved_parts
+            manifest_obj['status'] = 'dismantling'
             manifest.write_text(json.dumps(manifest_obj, ensure_ascii=False, indent=2), encoding='utf-8')
-            return self._json({
-                'ok': True, 'id': gid, 'candidates': candidates,
-                'count': len(candidates), 'saved_parts': saved_parts,
-            })
         except Exception as e:
-            return self._error('拆解失败：{0}'.format(e))
+            return self._error('拆解初始化失败：{0}'.format(e))
+
+        def _do_dismantle():
+            try:
+                ws = Workshop(str(BASE_DIR))
+                candidates = parse_skill_to_candidates(str(skill_md))
+                # 将候选零件写回零件库 library/，使其在「组件管理」货架中实时可见（需求1）
+                saved_parts = []
+                for i, c in enumerate(candidates):
+                    pid = 'part_dm_{0}_{1:03d}'.format(gid, i)
+                    part = {
+                        'id': pid,
+                        'name': c.get('name') or '候选零件 {0}'.format(i + 1),
+                        'category': c.get('category') or '参考文档',
+                        'sub_category': c.get('sub_category') or gid,
+                        'type': c.get('type') or '流程规范',
+                        'description': c.get('description') or '',
+                        'content': c.get('content') or '',
+                        'content_format': c.get('content_format') or 'markdown',
+                        'source_type': 'dismantled',
+                        # 同源标记：同一 Skill 拆解出的零件共享 source_skill_id，支撑「同源伙伴」（需求3）
+                        'source_skill_id': gid,
+                        'source_skill_name': c.get('source_skill_name') or gid,
+                        'metadata': dict(c.get('metadata') or {}),
+                        'version': 'v1.0',
+                        'depends_on': [],
+                        'conflicts_with': [],
+                    }
+                    try:
+                        ws.add_part(part)
+                        saved_parts.append(pid)
+                    except Exception:
+                        pass
+                now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                m = {}
+                if manifest.exists():
+                    try:
+                        m = json.loads(manifest.read_text(encoding='utf-8'))
+                    except Exception:
+                        m = {}
+                m['auto_dismantled'] = True
+                m['dismantled_at'] = now
+                m['dismantle_candidates'] = candidates
+                m['dismantle_saved_part_ids'] = saved_parts
+                m['status'] = 'done'
+                if not m.get('slug'):
+                    m['slug'] = make_slug(m.get('name') or gid, fallback=gid)
+                manifest.write_text(json.dumps(m, ensure_ascii=False, indent=2), encoding='utf-8')
+            except Exception as e:
+                logger.error('拆解失败：%s\n%s', e, traceback.format_exc())
+                try:
+                    m = {}
+                    if manifest.exists():
+                        try:
+                            m = json.loads(manifest.read_text(encoding='utf-8'))
+                        except Exception:
+                            m = {}
+                    m['status'] = 'error'
+                    m['error'] = str(e)
+                    manifest.write_text(json.dumps(m, ensure_ascii=False, indent=2), encoding='utf-8')
+                except Exception:
+                    pass
+
+        threading.Thread(target=_do_dismantle, daemon=True).start()
+        return self._json({'ok': True, 'id': gid, 'status': 'dismantling'})
 
     # ── Skill 发布链路：Git 同步 + SkillHub 发布 ──
     @staticmethod
