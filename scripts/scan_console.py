@@ -696,6 +696,54 @@ def scan_workshop():
 
 # ── 主流程 ──────────────────────────────────────────
 
+def build_overview(skills, storage_categories, storage_summary, conversations, overlaps=None, env=None, t0=None):
+    """从已扫描的各项数据中组装 overview / skills / storage / conversations 等输出结构。
+
+    供 scan_console.main() 与 server.py 的 /api/overview 复用，避免重复计算。
+    """
+    total_st = sum(c.get('size_bytes', 0) for c in storage_categories)
+    unused = [s for s in skills if s.get('status_color') in ('warn', 'danger')]
+    heavy = [s for s in skills if s.get('anomaly')]
+    high_risk = [s for s in skills if s.get('security_tier') in ('高', '危')]
+    total_findings = sum(len(s.get('security_findings') or []) for s in skills)
+    convos = conversations or {"total": 0, "recent_7d": 0, "recent_30d": 0, "by_project": []}
+
+    return {
+        "generated_at": (t0 or datetime.now()).strftime('%Y-%m-%d %H:%M:%S'),
+        "overview": {
+            "total_storage_bytes": total_st,
+            "total_storage": size_human(total_st),
+            "total_skills": len(skills),
+            "unused_skills": len(unused),
+            "token_heavy": len(heavy),
+            "conversations_7d": convos.get("recent_7d", 0),
+            "conversations_30d": convos.get("recent_30d", 0),
+            "total_conversations": convos.get("total", 0),
+            "security_warnings": total_findings,
+            "high_risk_count": len(high_risk),
+            "overlap_pairs": len(overlaps or []),
+        },
+        "skills": skills,
+        "storage": {"categories": storage_categories, "summary": storage_summary},
+        "conversations": convos,
+        "overlaps": overlaps or [],
+        "env": env or scan_env(),
+        "security": {
+            "high_risk": [
+                {"name": s["display_name"], "id": s["id"],
+                 "tier": s["security_tier"], "findings": s["security_findings"]}
+                for s in high_risk
+            ],
+            "total_findings": total_findings,
+        },
+        "unused_skills": [
+            {"name": s["display_name"], "id": s["id"],
+             "days_unused": s.get("days_unused"), "status": s["status"]}
+            for s in unused
+        ],
+    }
+
+
 def scan_env():
     """探测运行环境：扫描根目录与 Python 解释器（跨平台，兼容 Windows / macOS / Linux / iOS 等类 Unix）。"""
     home = detect_workbuddy_home()
@@ -779,45 +827,8 @@ def main(argv=None):
     print(f"  [env] 运行环境  →  {env['os']} | Python: {env['python_path'] or '(未找到)'}")
 
     # ── 组装输出 ──
-    unused = [s for s in skills if s['status_color'] in ('warn', 'danger')]
-    heavy = [s for s in skills if s['anomaly']]
-    high_risk = [s for s in skills if s['security_tier'] in ('高', '危')]
-
-    data = {
-        "generated_at": t0.strftime('%Y-%m-%d %H:%M:%S'),
-        "overview": {
-            "total_storage_bytes": total_st,
-            "total_storage": size_human(total_st),
-            "total_skills": len(skills),
-            "unused_skills": len(unused),
-            "token_heavy": len(heavy),
-            "conversations_7d": convos["recent_7d"],
-            "conversations_30d": convos["recent_30d"],
-            "total_conversations": convos["total"],
-            "security_warnings": total_findings,
-            "high_risk_count": len(high_risk),
-            "overlap_pairs": len(overlaps),
-        },
-        "skills": skills,
-        "workshop": workshop,
-        "storage": {"categories": cats, "summary": sumry},
-        "conversations": convos,
-        "overlaps": overlaps,
-        "env": env,
-        "security": {
-            "high_risk": [
-                {"name": s["display_name"], "id": s["id"],
-                 "tier": s["security_tier"], "findings": s["security_findings"]}
-                for s in high_risk
-            ],
-            "total_findings": total_findings,
-        },
-        "unused_skills": [
-            {"name": s["display_name"], "id": s["id"],
-             "days_unused": s.get("days_unused"), "status": s["status"]}
-            for s in unused
-        ],
-    }
+    data = build_overview(skills, cats, sumry, convos, overlaps, env, t0)
+    data["workshop"] = workshop
 
     here = str(Path(__file__).resolve().parent)
     out = args.output or os.path.join(here, "console_data.json")

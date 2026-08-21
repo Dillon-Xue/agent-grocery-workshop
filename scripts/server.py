@@ -38,7 +38,10 @@ logger = logging.getLogger("agent-grocery-workshop")
 from dismantle import parse_skill_to_candidates
 from scan_console import scan_workshop as scan_workshop_live
 import scan_console
-from scan_console import scan_skills, load_usage, merge_usage, scan_storage_live, size_human
+from scan_console import (
+    scan_skills, load_usage, merge_usage, scan_storage_live, size_human,
+    build_overview, scan_conversations,
+)
 
 # ── 运行时缓存 ──
 STORAGE_CACHE = None
@@ -47,6 +50,9 @@ STORAGE_LOCK = threading.Lock()
 SKILLS_CACHE = None
 SKILLS_SCANNING = False
 SKILLS_LOCK = threading.Lock()
+OVERVIEW_CACHE = None
+OVERVIEW_SCANNING = False
+OVERVIEW_LOCK = threading.Lock()
 
 
 def _empty_storage():
@@ -99,6 +105,37 @@ def refresh_skills_cache():
     finally:
         with SKILLS_LOCK:
             SKILLS_SCANNING = False
+
+
+def refresh_overview_cache():
+    """后台刷新概览缓存：复用 skills/storage 缓存，只重新扫描对话统计。"""
+    global OVERVIEW_CACHE, OVERVIEW_SCANNING
+    with OVERVIEW_LOCK:
+        if OVERVIEW_SCANNING:
+            return
+        OVERVIEW_SCANNING = True
+    try:
+        with SKILLS_LOCK:
+            skills = list(SKILLS_CACHE) if SKILLS_CACHE else []
+        with STORAGE_LOCK:
+            storage = STORAGE_CACHE or _empty_storage()
+        convos = scan_conversations()
+        data = build_overview(
+            skills,
+            storage.get("categories", []),
+            storage.get("summary", {}),
+            convos,
+            overlaps=[],
+        )
+        with OVERVIEW_LOCK:
+            OVERVIEW_CACHE = data
+        logger.info("概览缓存已刷新: %d skills, storage=%s, convos=%s",
+                     len(skills), data["overview"]["total_storage"], convos.get("total", 0))
+    except Exception as e:
+        logger.error("概览缓存刷新失败: %s\n%s", e, traceback.format_exc())
+    finally:
+        with OVERVIEW_LOCK:
+            OVERVIEW_SCANNING = False
 
 
 # ── 配置 ──
@@ -311,6 +348,8 @@ class APIHandler(BaseHTTPRequestHandler):
             return self.handle_skills_refresh(payload)
         if path == "/api/storage":
             return self.handle_storage_refresh(payload)
+        if path == "/api/overview":
+            return self.handle_overview_refresh(payload)
         if path == "/api/skill/install":
             return self.handle_skill_install(payload)
         if path == "/api/skill/dismantle":
@@ -1456,6 +1495,35 @@ class APIHandler(BaseHTTPRequestHandler):
             threading.Thread(target=refresh_storage_cache, daemon=True).start()
         return self._json({'ok': True, 'storage': _empty_storage(), 'fresh': False, 'scanning': True})
 
+    def handle_overview_refresh(self, payload):
+        """概览聚合数据：复用 skills/storage 缓存 + 实时对话统计；每次请求都重建，避免空缓存污染。"""
+        # 确保依赖缓存已被触发
+        with SKILLS_LOCK:
+            skills_cache = SKILLS_CACHE
+        with STORAGE_LOCK:
+            storage_cache = STORAGE_CACHE
+        if skills_cache is None and not SKILLS_SCANNING:
+            threading.Thread(target=refresh_skills_cache, daemon=True).start()
+        if storage_cache is None and not STORAGE_SCANNING:
+            threading.Thread(target=refresh_storage_cache, daemon=True).start()
+
+        skills = list(skills_cache) if skills_cache else []
+        storage = storage_cache if storage_cache else _empty_storage()
+        fresh = bool(skills_cache) and bool(storage_cache)
+        try:
+            convos = scan_conversations()
+            data = build_overview(
+                skills,
+                storage.get("categories", []),
+                storage.get("summary", {}),
+                convos,
+                overlaps=[],
+            )
+            return self._json({'ok': True, 'data': data, 'fresh': fresh, 'scanning': SKILLS_SCANNING or STORAGE_SCANNING})
+        except Exception as e:
+            logger.error('概览聚合失败: %s\n%s', e, traceback.format_exc())
+            return self._error('概览聚合失败：' + str(e))
+
 # ── 回收站 / 安全工具（模块级）──
 CONVERSATIONS_DIR = WORKBUDDY_ROOT / "projects"
 
@@ -1665,6 +1733,7 @@ def run(port=8080):
     # 启动后在后台预刷新 Skill / 存储缓存，避免前端首次加载长时间等待
     threading.Thread(target=refresh_skills_cache, daemon=True).start()
     threading.Thread(target=refresh_storage_cache, daemon=True).start()
+    threading.Thread(target=refresh_overview_cache, daemon=True).start()
     print(f"WorkBuddy Console Server: http://0.0.0.0:{port}")
     ThreadingHTTPServer(("0.0.0.0", port), APIHandler).serve_forever()
 
