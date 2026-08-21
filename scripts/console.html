@@ -369,6 +369,11 @@ tbody tr:hover{background:var(--surface-2)}
 .part-foot{display:flex;align-items:center;gap:8px;font-size:11px}
 .use-tag{color:var(--cyan);font-family:var(--mono)}
 .chip{font-size:10.5px;padding:2px 8px;border-radius:6px;background:var(--surface-2);color:var(--dim);font-family:var(--mono);white-space:nowrap}
+.part-name-chip{display:inline;color:var(--cyan);cursor:pointer;margin-right:6px}
+.part-name-chip:hover{color:var(--blue);text-decoration:underline}
+.skill-name-link{display:inline;color:var(--cyan);cursor:pointer}
+.skill-name-link:hover{color:var(--blue);text-decoration:underline}
+.comp-cell{display:flex;align-items:center;flex-wrap:wrap;gap:2px;max-width:240px}
 .dept{margin-bottom:22px}
 .dept-head{display:flex;align-items:center;gap:10px;margin-bottom:12px}
 .dept-head h2{font-size:14px;font-weight:600}
@@ -1042,6 +1047,57 @@ function positionTooltip(el,tt){
   tt.style.top=top+'px'; tt.style.left=left+'px';
 }
 
+// ── 跨页面跳转过滤辅助 ──
+function goToPartAndFilter(name){
+  if(!name)return;
+  shelfQuery=name; shelfFilter=''; shelfPage=1;
+  switchTab('shelf');
+}
+function goToSkillAndFilter(name){
+  if(!name)return;
+  skQuery=name; skFilter='all'; skPage=1;
+  switchTab('skills');
+}
+function getPartNameById(pid){
+  const W=DATA&&DATA.workshop||{};
+  const p=(W.parts_by_id||{})[pid];
+  return p&&p.name?p.name:pid;
+}
+function resolveGenerationParts(g){
+  const W=DATA&&DATA.workshop||{};
+  const saved=(g&&g.dismantle_saved_part_ids)||[];
+  if(saved.length){
+    return saved.map(pid=>{const p=(W.parts_by_id||{})[pid]; return {id:pid, name:(p&&p.name)||pid};}).filter(x=>x.name);
+  }
+  const cands=(g&&g.dismantle_candidates)||[];
+  return cands.map((c,i)=>({id:(c&&c.id)||('cand_'+i), name:(c&&c.name)||''})).filter(x=>x.name);
+}
+function componentNameListHtml(parts, maxVisible){
+  const max=maxVisible||3;
+  if(!parts.length) return '<span style="color:var(--faint)">—</span>';
+  const visible=parts.slice(0,max);
+  const hidden=parts.slice(max);
+  const head=visible.map(p=>'<span class="part-name-chip" data-pid="'+esc(p.id)+'" data-pname="'+esc(p.name)+'">'+esc(p.name)+'</span>').join('');
+  if(!hidden.length) return head;
+  const allNames=parts.map(p=>p.name).join('、');
+  return '<span data-tooltip="'+tooltipAttr({title:'全部组件',desc:allNames})+'">'+head+'<span class="part-name-chip" style="color:var(--dim)">+'+hidden.length+'</span></span>';
+}
+function findGenerationForSkill(skill){
+  const gens=((DATA&&DATA.workshop)||{}).generations||[];
+  return gens.find(g=>g.name===skill.display_name || g.name===skill.name || g.id===skill.id || g.id===skill.name || g.slug===skill.id || g.slug===skill.name);
+}
+function _bindPartNameChips(root){
+  if(!root)return;
+  root.querySelectorAll('.part-name-chip[data-pname]').forEach(el=>{
+    el.onclick=function(e){e.stopPropagation(); goToPartAndFilter(this.dataset.pname);};
+  });
+}
+function _setDsmButtons(id, disabled, text){
+  document.querySelectorAll('.btn-dsm-run[data-dsm]').forEach(b=>{
+    if(b.dataset.dsm===id){b.disabled=!!disabled; if(text!==undefined)b.textContent=text;}
+  });
+}
+
 function openModal(title, html, onConfirm, danger){
   document.getElementById('m-title').innerHTML=title;
   document.getElementById('m-body').innerHTML=html;
@@ -1527,13 +1583,22 @@ function drawSk(){
       <td>${s.security_tier==='低'?'<span style="color:var(--dim)">—</span>':`<span class="mini-find high" data-tooltip='${esc(JSON.stringify({title:'风险原因',desc:((s.security_findings||[]).map(f=>f.note).join('；')||'暂无')}))}'>是</span>`}</td>
       <td><div class="act-bar">
         <button class="btn up" data-act="up" data-id="${esc(s.id)}">升级</button>
+        <button class="btn" data-act="dsm" data-id="${esc(s.id)}">任务拆解</button>
         <button class="btn danger" data-act="del" data-id="${esc(s.id)}">删除</button>
       </div></td>
     </tr>`).join('')||'<tr><td colspan="8"><div class="empty"><div class="e-ico">∅</div>无匹配 Skill</div></td></tr>';
   renderSkPager(totalPages, arr.length);
   document.querySelectorAll('#sk-body [data-act]').forEach(b=>b.onclick=function(){
     const s=DATA.skills.find(x=>x.id===this.dataset.id);if(!s)return;
-    if(this.dataset.act==='up')upgradeSkill(s);else deleteSkill(s);
+    const act=this.dataset.act;
+    if(act==='up')upgradeSkill(s);
+    else if(act==='del')deleteSkill(s);
+    else if(act==='dsm'){
+      const gen=findGenerationForSkill(s);
+      if(!gen){toast('该 Skill 没有对应的生成记录，无法直接拆解');return;}
+      switchTab('dismantle');
+      _runDismantle(gen.id, null);
+    }
   });
 }
 function renderSkPager(totalPages,totalItems){
@@ -1834,8 +1899,11 @@ function showPartDetail(id){
   const body=document.getElementById('skill-float-body'); const float=document.getElementById('skill-float'); const bd=document.getElementById('skill-float-backdrop');
   if(!body||!float||!bd)return;
   const deps=(p.depends_on||[]).map(d=>{const dp=W.parts_by_id[d]; return dp?'<span class="chip">'+esc(dp.name)+'</span>':esc(d);}).join('')||'<span style="color:var(--faint)">无</span>';
-  const srcSkill=p.source_skill_name || p.source_skill_id || '—';
-  const sibs=(p.siblings||[]).slice(0,8).map(s=>{const sp=W.parts_by_id[s.id]; return sp?'<span class="chip">'+esc(sp.name)+'</span>':esc(s.id);}).join('')||'<span style="color:var(--faint)">无</span>';
+  const hasSource=!!(p.source_skill_name || p.source_skill_id);
+  const srcSkillHtml=hasSource
+    ? '<span class="skill-name-link" data-sname="'+esc(p.source_skill_name||p.source_skill_id)+'">'+esc(p.source_skill_name||p.source_skill_id)+'</span>'
+    : '<span style="color:var(--faint)">—</span>';
+  const sibs=(p.siblings||[]).slice(0,8).map(s=>{const sp=W.parts_by_id[s.id]; const nm=(sp&&sp.name)||s.name||s.id; return '<span class="chip part-name-chip" data-pid="'+esc(s.id)+'" data-pname="'+esc(nm)+'">'+esc(nm)+'</span>';}).join('')||'<span style="color:var(--faint)">无</span>';
   body.innerHTML=`
     <div class="sd-header"><div class="title-row"><div class="cn">${esc(p.name)}</div><span class="ver">${esc(p.type||'—')}</span></div>
       <div class="idline"><span>${esc(p.category||'')}</span>${p.sub_category?'<span>'+esc(p.sub_category)+'</span>':''}<span>使用 ${p.usage_count||0} 次</span></div>
@@ -1845,9 +1913,13 @@ function showPartDetail(id){
       <div class="sec" style="margin-bottom:18px"><div class="sec-title">功能描述</div><div style="font-size:13.5px;color:var(--text);line-height:1.8">${esc(p.description||'暂无描述')}</div></div>
       <div class="sec" style="margin-bottom:18px"><div class="sec-title">内容摘要</div><pre style="background:var(--surface-2);border:1px solid var(--border);border-radius:10px;padding:14px;font-size:12px;overflow-x:auto;max-height:260px;white-space:pre-wrap;word-break:break-all;color:var(--dim);line-height:1.6"><code>${esc(p.content ? (p.content.length>800 ? p.content.slice(0,800)+'…' : p.content) : '无内容')}</code></pre></div>
       <div class="sec" style="margin-bottom:18px"><div class="sec-title">依赖</div><div>${deps}</div></div>
-      <div class="sec" style="margin-bottom:18px"><div class="sec-title">来源 Skill</div><div>${esc(srcSkill)}</div></div>
+      <div class="sec" style="margin-bottom:18px"><div class="sec-title">来源 Skill</div><div>${srcSkillHtml}</div></div>
       <div class="sec" style="margin-bottom:18px"><div class="sec-title">同源伙伴</div><div>${sibs}</div></div>
     </div>`;
+  body.querySelectorAll('.skill-name-link[data-sname]').forEach(el=>{
+    el.onclick=()=>goToSkillAndFilter(el.dataset.sname);
+  });
+  _bindPartNameChips(body);
   float.classList.add('show'); bd.classList.add('show');
 }
 function placeCapsules(mode='detail'){
@@ -2264,14 +2336,18 @@ function _renderSkillDev(c){
       const installLabel=g.installed===true?'重新安装':'安装';
       actionHtml='<button class="btn btn-install" data-job="'+esc(g.id||'')+'">'+installLabel+'</button>'+
         '<button class="btn btn-git" data-job="'+esc(g.id||'')+'">上传git</button>'+
-        '<button class="btn btn-publish" data-job="'+esc(g.id||'')+'">发布Skillhub</button>';
+        '<button class="btn btn-publish" data-job="'+esc(g.id||'')+'">发布Skillhub</button>'+
+        '<button class="btn btn-dsm" data-job="'+esc(g.id||'')+'">拆解</button>';
     }
+    const parts=resolveGenerationParts(g);
+    const compCell=componentNameListHtml(parts, 3);
+    const compCountTip=parts.length?tooltipAttr({title:'组件列表（'+parts.length+' 个）',desc:parts.map(p=>p.name).join('、')}):'';
     return '<tr data-job="'+esc(g.id||'')+'">'+
       '<td><div class="skill-name"><div><div class="nm">'+esc(g.name)+'</div><div class="id">'+esc(g.slug||'')+'</div></div></div></td>'+
       '<td><div class="lt-desc" title="'+esc(desc)+'">'+esc(descShort||'—')+'</div></td>'+
       '<td><span class="lt-tag '+statusClass+'">'+statusLabel+'</span></td>'+
       '<td>'+esc(g.created_at||'')+'</td>'+
-      '<td>'+ids.length+' 个</td>'+
+      '<td class="comp-cell" '+(compCountTip?'data-tooltip="'+compCountTip+'"':'')+'><span style="color:var(--faint)">'+parts.length+' 个</span><div style="margin-left:auto">'+compCell+'</div></td>'+
       '<td><span class="src-tag">'+esc(src)+'</span></td>'+
       '<td><div class="sk-acts">'+actionHtml+'</div></td>'+
     '</tr>';
@@ -2285,7 +2361,7 @@ function _renderSkillDev(c){
 
   c.innerHTML=head+
     '<div class="table-wrap">'+
-      '<table><thead><tr><th>Skill名称</th><th>功能描述</th><th>状态</th><th>生成时间</th><th>零件数</th><th>来源</th><th>操作</th></tr></thead><tbody>'+rows+'</tbody></table>'+
+      '<table><thead><tr><th>Skill名称</th><th>功能描述</th><th>状态</th><th>生成时间</th><th>组件数</th><th>来源</th><th>操作</th></tr></thead><tbody>'+rows+'</tbody></table>'+
     '</div>'+pag;
 
   // 行点击打开抽屉
@@ -2306,6 +2382,10 @@ function _renderSkillDev(c){
   c.querySelectorAll('.btn-publish').forEach(btn=>{
     btn.onclick=(e)=>{e.stopPropagation(); _publishGenerated(btn.dataset.job, btn);};
   });
+  c.querySelectorAll('.btn-dsm').forEach(btn=>{
+    btn.onclick=(e)=>{e.stopPropagation(); switchTab('dismantle'); _runDismantle(btn.dataset.job, null);};
+  });
+  _bindPartNameChips(c);
   c.querySelectorAll('[data-spg]').forEach(b=>b.onclick=function(){
     if(b.dataset.spg==='prev'&&skillDevPage>1)skillDevPage--;
     else if(b.dataset.spg==='next'&&skillDevPage<totalPages)skillDevPage++;
@@ -2383,7 +2463,6 @@ function _renderDismantle(c){
     const done=!!g.auto_dismantled || g.status==='done';
     const dismantling=g.status==='dismantling';
     const failed=g.status==='error';
-    const cands=(g.dismantle_candidates||[]).length;
     let statusClass, statusLabel;
     if(failed){statusClass='r';statusLabel='拆解失败';}
     else if(dismantling){statusClass='cyan';statusLabel='拆解中';}
@@ -2392,9 +2471,13 @@ function _renderDismantle(c){
     const idStr=g.id?g.id.slice(0,8):'—';
     const desc=g.description||'';
     const descShort=desc.length>40?desc.slice(0,40)+'…':desc;
-    const prodCell = failed
-      ? '<span style="color:var(--red)">'+esc(g.error||'失败')+'</span>'
-      : (dismantling ? '拆解进行中…' : (done?cands+' 个零件':'—'));
+    let prodCell;
+    if(failed) prodCell='<span style="color:var(--red)">'+esc(g.error||'失败')+'</span>';
+    else if(dismantling) prodCell='<span style="color:var(--dim)">拆解进行中…</span>';
+    else if(done){
+      const parts=resolveGenerationParts(g);
+      prodCell='<div class="comp-cell">'+componentNameListHtml(parts, 3)+'</div>';
+    }else prodCell='<span style="color:var(--faint)">—</span>';
     return '<tr data-dsm="'+esc(g.id||'')+'">'+
       '<td><div class="skill-name"><div><div class="nm">'+esc(g.name)+'</div><div class="id">'+esc(g.slug||'')+'</div></div></div></td>'+
       '<td><div class="lt-desc" title="'+esc(desc)+'">'+esc(descShort||'—')+'</div></td>'+
@@ -2422,6 +2505,7 @@ function _renderDismantle(c){
   const open=(id)=>{const rec=gens.find(g=>g.id===id); if(rec)openDsmDrawer(rec);};
   c.querySelectorAll('tbody tr[data-dsm]').forEach(tr=>{tr.onclick=()=>open(tr.dataset.dsm);});
   c.querySelectorAll('.btn-dsm-run').forEach(btn=>{btn.onclick=(e)=>{e.stopPropagation(); _runDismantle(btn.dataset.dsm, btn);};});
+  _bindPartNameChips(c);
   c.querySelectorAll('[data-dpg]').forEach(b=>b.onclick=function(){
     if(b.dataset.dpg==='prev'&&dsmPage>1)dsmPage--;
     else if(b.dataset.dpg==='next'&&dsmPage<totalPages)dsmPage++;
@@ -2515,22 +2599,25 @@ function _runDismantleFromDrawer(){
 }
 function _runDismantle(id, btn){
   if(!id){toast('请选择一个任务');return;}
-  btn.disabled=true;btn.textContent='拆解中…';
+  if(btn){btn.disabled=true;btn.textContent='拆解中…';}
+  _setDsmButtons(id, true, '拆解中…');
   apiPost('/api/skill/dismantle',{id:id}).then(d=>{
-    if(!d.ok){btn.disabled=false;btn.textContent='执行拆解';toast('拆解失败：'+(d.error||''));return;}
+    if(!d.ok){if(btn){btn.disabled=false;btn.textContent='执行拆解';} _setDsmButtons(id, false, '执行拆解'); toast('拆解失败：'+(d.error||''));return;}
     // 轮询直到拆解完成 / 失败，期间列表实时显示「拆解中」（需求2·问题1）
     const poll=()=>{
       loadWorkshop(true).then(()=>{
         const rec=(DATA.workshop.generations||[]).find(g=>g.id===id);
         if(rec&&openDsmJobId===id)renderDsmDrawerContent(rec);
         if(rec&&rec.status==='done'){
-          btn.disabled=false;btn.textContent='重新拆解';
+          if(btn){btn.disabled=false;btn.textContent='重新拆解';}
+          _setDsmButtons(id, false, '重新拆解');
           toast('拆解完成，识别 '+((rec.dismantle_candidates||[]).length)+' 个候选零件');
           if(currentTab==='dismantle')renderDismantle(document.getElementById('content'));
           return;
         }
         if(rec&&rec.status==='error'){
-          btn.disabled=false;btn.textContent='执行拆解';
+          if(btn){btn.disabled=false;btn.textContent='执行拆解';}
+          _setDsmButtons(id, false, '执行拆解');
           toast('拆解失败：'+(rec.error||'未知错误'));
           if(currentTab==='dismantle')renderDismantle(document.getElementById('content'));
           return;
@@ -2539,7 +2626,7 @@ function _runDismantle(id, btn){
       });
     };
     poll();
-  }).catch(e=>{btn.disabled=false;btn.textContent='执行拆解';toast('拆解请求失败：'+apiErrorHint(e));});
+  }).catch(e=>{if(btn){btn.disabled=false;btn.textContent='执行拆解';} _setDsmButtons(id, false, '执行拆解'); toast('拆解请求失败：'+apiErrorHint(e));});
 }
 
 // ── 对话（持久化到 localStorage，切换/刷新不丢失） ──
