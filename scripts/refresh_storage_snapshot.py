@@ -19,7 +19,7 @@ HTML = ROOT / "scripts" / "console.html"
 JSON = ROOT / "scripts" / "console_data.json"
 
 
-def quick_scan(path, timeout=30):
+def quick_scan(path, timeout=60):
     """返回 (size_bytes, file_count)。"""
     if not os.path.isdir(path):
         return 0, 0
@@ -51,7 +51,8 @@ print("[refresh_storage_snapshot] scanning storage...")
 cats = []
 safe_b = cautious_b = skill_b = never_b = 0
 for c in STORAGE_CATEGORIES:
-    sz, cnt = quick_scan(c["path"])
+    timeout = 120 if c["risk"] == "never" else 60
+    sz, cnt = quick_scan(c["path"], timeout=timeout)
     cats.append({
         **c,
         "size_bytes": sz,
