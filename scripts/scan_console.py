@@ -493,33 +493,60 @@ def scan_storage():
         elif c["risk"] == "skill": skill_b += sz
         else: never_b += sz
 
+    total_b = safe_b + cautious_b + skill_b + never_b
     return cats, {
         "safe_total": size_human(safe_b), "safe_bytes": safe_b,
         "cautious_total": size_human(cautious_b), "cautious_bytes": cautious_b,
         "skill_total": size_human(skill_b), "skill_bytes": skill_b,
         "never_total": size_human(never_b), "never_bytes": never_b,
+        "total_bytes": total_b, "total_human": size_human(total_b),
     }
 
 
 def _scan_one_category(path, timeout_per_cat=50):
-    """扫描单个分类：返回 (size_bytes, file_count)。"""
+    """扫描单个分类：返回 (size_bytes, file_count)。兼容 Windows 与 WSL。"""
     sz = cnt = 0
-    if os.path.isdir(path):
+    if not os.path.isdir(path):
+        return sz, cnt
+    # Windows：用 PowerShell 求和文件大小与计数
+    if sys.platform == "win32":
         try:
-            r = subprocess.run(["du", "-sb", path], capture_output=True, text=True, timeout=timeout_per_cat)
+            r = subprocess.run(
+                ["powershell", "-NoProfile", "-Command",
+                 f'(Get-ChildItem -Path "{path}" -Recurse -File -ErrorAction SilentlyContinue | Measure-Object -Property Length -Sum).Sum'],
+                capture_output=True, text=True, timeout=timeout_per_cat
+            )
             if r.returncode == 0:
-                sz = int(r.stdout.split()[0])
+                sz = int(r.stdout.strip() or 0)
         except Exception:
             pass
         try:
             r = subprocess.run(
-                ["sh", "-c", 'find "$1" -type f 2>/dev/null | wc -l', "_", path],
+                ["powershell", "-NoProfile", "-Command",
+                 f'(Get-ChildItem -Path "{path}" -Recurse -File -ErrorAction SilentlyContinue | Measure-Object).Count'],
                 capture_output=True, text=True, timeout=timeout_per_cat
             )
             if r.returncode == 0:
                 cnt = int(r.stdout.strip() or 0)
         except Exception:
             pass
+        return sz, cnt
+    # Linux / WSL / macOS
+    try:
+        r = subprocess.run(["du", "-sb", path], capture_output=True, text=True, timeout=timeout_per_cat)
+        if r.returncode == 0:
+            sz = int(r.stdout.split()[0])
+    except Exception:
+        pass
+    try:
+        r = subprocess.run(
+            ["sh", "-c", 'find "$1" -type f 2>/dev/null | wc -l', "_", path],
+            capture_output=True, text=True, timeout=timeout_per_cat
+        )
+        if r.returncode == 0:
+            cnt = int(r.stdout.strip() or 0)
+    except Exception:
+        pass
     return sz, cnt
 
 
@@ -538,11 +565,13 @@ def scan_storage_live(timeout_per_cat=50):
         elif c["risk"] == "skill": skill_b += sz
         else: never_b += sz
 
+    total_b = safe_b + cautious_b + skill_b + never_b
     return cats, {
         "safe_total": size_human(safe_b), "safe_bytes": safe_b,
         "cautious_total": size_human(cautious_b), "cautious_bytes": cautious_b,
         "skill_total": size_human(skill_b), "skill_bytes": skill_b,
         "never_total": size_human(never_b), "never_bytes": never_b,
+        "total_bytes": total_b, "total_human": size_human(total_b),
     }
 
 
