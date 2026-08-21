@@ -40,7 +40,29 @@ from scan_console import scan_workshop as scan_workshop_live
 import scan_console
 
 # ── 配置 ──
-WORKBUDDY_ROOT = Path.home() / ".workbuddy"
+def detect_workbuddy_home():
+    """探测 WorkBuddy 主目录。
+
+    优先级：
+    1. 环境变量 WORKBUDDY_HOME
+    2. WSL 下探测挂载的 Windows 用户目录 /mnt/c/Users/<user>/.workbuddy
+    3. 当前用户 home 下的 ~/.workbuddy
+    """
+    env = os.environ.get('WORKBUDDY_HOME')
+    if env:
+        return env
+    win_users = '/mnt/c/Users'
+    if os.path.isdir(win_users):
+        for name in sorted(os.listdir(win_users)):
+            if name in ('Public', 'Default', 'All Users', 'Default User'):
+                continue
+            cand = os.path.join(win_users, name, '.workbuddy')
+            if os.path.isdir(cand):
+                return cand
+    return os.path.expanduser("~/.workbuddy")
+
+
+WORKBUDDY_ROOT = Path(detect_workbuddy_home())
 SKILLS_DIR = WORKBUDDY_ROOT / "skills"
 BASE_DIR = Path(__file__).resolve().parent.parent
 CONFIG_FILE = BASE_DIR / "console_config.json"

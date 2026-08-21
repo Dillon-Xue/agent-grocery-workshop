@@ -644,7 +644,7 @@ def scan_workshop():
 
 def scan_env():
     """探测运行环境：扫描根目录与 Python 解释器（跨平台，兼容 Windows / macOS / Linux / iOS 等类 Unix）。"""
-    home = os.path.expanduser("~/.workbuddy")
+    home = detect_workbuddy_home()
     os_name = platform.system() or os.name
     # 托管 Python：WorkBuddy 自带的隔离解释器
     # Windows 为 python.exe；类 Unix（macOS/Linux/iOS-iSH/a-Shell）无 .exe 后缀
