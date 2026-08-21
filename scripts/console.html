@@ -374,7 +374,7 @@ tbody tr:hover{background:var(--surface-2)}
 .skill-name-link{display:inline;color:var(--cyan);cursor:pointer}
 .skill-name-link:hover{color:var(--blue);text-decoration:underline}
 .comp-cell{display:flex;align-items:center;flex-wrap:wrap;gap:2px;max-width:240px}
-.comp-count{display:inline;color:var(--cyan);cursor:pointer;font-weight:600}
+.comp-count{display:inline-block;color:var(--cyan);cursor:pointer;font-weight:600;white-space:nowrap;vertical-align:middle;line-height:1.4}
 .comp-count:hover{color:var(--blue);text-decoration:underline}
 .sk-acts-links{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
 .sk-act-link{color:var(--cyan);font-size:12px;cursor:pointer;white-space:nowrap}
@@ -385,11 +385,14 @@ tbody tr:hover{background:var(--surface-2)}
 .dept-head .cnt{font-size:11px;color:var(--dim);font-family:var(--mono)}
 
 /* 全局悬停提示 */
-#global-tooltip{position:fixed;z-index:100;max-width:320px;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:10px 12px;box-shadow:0 10px 30px rgba(0,0,0,.4);font-size:12px;color:var(--dim);line-height:1.5;pointer-events:none;opacity:0;transition:opacity .12s}
+#global-tooltip{position:fixed;z-index:100;max-width:320px;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:10px 12px;box-shadow:0 10px 30px rgba(0,0,0,.4);font-size:12px;color:var(--dim);line-height:1.5;pointer-events:auto;opacity:0;transition:opacity .12s}
 #global-tooltip.show{opacity:1}
-#global-tooltip .tt-title{font-weight:600;color:var(--text);margin-bottom:4px;font-size:13px}
+#global-tooltip .tt-title{font-weight:600;color:var(--text);margin-bottom:6px;font-size:13px}
 #global-tooltip .tt-row{display:flex;gap:8px;flex-wrap:wrap;margin-top:6px}
 #global-tooltip .tt-row .chip{font-size:10px}
+.tt-part-list{display:flex;flex-direction:column;gap:3px}
+.tt-part-list .tt-part-item{display:inline-flex;align-items:center;color:var(--cyan);cursor:pointer;padding:2px 0;word-break:break-all}
+.tt-part-list .tt-part-item:hover{color:var(--blue);text-decoration:underline}
 
 /* 列表视图 */
 .lt-name{font-weight:550}
@@ -1018,23 +1021,42 @@ function apiPost(path,body){
 // ── 全局悬停提示 ──
 function initTooltip(){
   const tt=document.getElementById('global-tooltip'); if(!tt)return;
+  let hideTimer=null;
+  function clearHide(){ if(hideTimer){clearTimeout(hideTimer); hideTimer=null;} }
+  function scheduleHide(){ clearHide(); hideTimer=setTimeout(()=>tt.classList.remove('show'),120); }
+  function buildHtml(obj){
+    let html='<div class="tt-title">'+esc(obj.title||'')+'</div>';
+    if(obj.items&&obj.items.length){
+      html+='<div class="tt-part-list">'+obj.items.map(it=>'<span class="tt-part-item" data-pid="'+esc(it.id||'')+'" data-pname="'+esc(it.name||'')+'">'+esc(it.name||'')+'</span>').join('')+'</div>';
+    } else {
+      html+=esc(obj.desc||'');
+    }
+    if(obj.tags&&obj.tags.length) html+='<div class="tt-row">'+obj.tags.map(t=>'<span class="chip">'+esc(t)+'</span>').join('')+'</div>';
+    return html;
+  }
   document.body.addEventListener('mouseover',e=>{
     const el=e.target.closest('[data-tooltip]'); if(!el)return;
+    clearHide();
     const data=el.dataset.tooltip; if(!data)return;
     let html='';
-    try{
-      const obj=JSON.parse(data);
-      html='<div class="tt-title">'+esc(obj.title||'')+'</div>'+esc(obj.desc||'');
-      if(obj.tags&&obj.tags.length) html+='<div class="tt-row">'+obj.tags.map(t=>'<span class="chip">'+esc(t)+'</span>').join('')+'</div>';
-    }catch(err){ html=esc(data); }
+    try{ html=buildHtml(JSON.parse(data)); }catch(err){ html=esc(data); }
     tt.innerHTML=html; tt.classList.add('show');
     positionTooltip(el,tt);
   });
   document.body.addEventListener('mouseout',e=>{
-    if(e.target.closest('[data-tooltip]')) tt.classList.remove('show');
+    const el=e.target.closest('[data-tooltip]'); if(!el)return;
+    scheduleHide();
   });
   document.body.addEventListener('mousemove',e=>{
     const el=e.target.closest('[data-tooltip]'); if(!el)return; positionTooltip(el,tt);
+  });
+  tt.addEventListener('mouseenter',clearHide);
+  tt.addEventListener('mouseleave',()=>tt.classList.remove('show'));
+  tt.addEventListener('click',e=>{
+    const item=e.target.closest('.tt-part-item'); if(!item)return;
+    e.preventDefault(); e.stopPropagation();
+    tt.classList.remove('show');
+    goToPartAndFilter(item.dataset.pname||'');
   });
 }
 function positionTooltip(el,tt){
@@ -1084,15 +1106,13 @@ function componentNameListHtml(parts, maxVisible){
   const hidden=parts.slice(max);
   const head=visible.map(p=>'<span class="part-name-chip" data-pid="'+esc(p.id)+'" data-pname="'+esc(p.name)+'">'+esc(p.name)+'</span>').join('');
   if(!hidden.length) return head;
-  const allNames=parts.map(p=>p.name).join('、');
-  return '<span data-tooltip="'+tooltipAttr({title:'全部组件',desc:allNames})+'">'+head+'<span class="part-name-chip" style="color:var(--dim)">+'+hidden.length+'</span></span>';
+  return '<span data-tooltip="'+tooltipAttr({title:'全部组件',items:parts.map(p=>({id:p.id,name:p.name}))})+'">'+head+'<span class="part-name-chip" style="color:var(--dim)">+'+hidden.length+'</span></span>';
 }
 // 紧凑组件计数：蓝色 N 个，hover tooltip 展示全部名称，点击跳转到组件管理
 function componentCountHtml(parts){
   if(!parts.length) return '<span style="color:var(--faint)">0 个</span>';
-  const allNames=parts.map(p=>p.name).join('、');
   const firstId=parts[0]&&parts[0].id;
-  return '<span class="comp-count" data-pid="'+esc(firstId||'')+'" data-tooltip="'+tooltipAttr({title:'组件列表（'+parts.length+' 个）',desc:allNames})+'">'+parts.length+' 个</span>';
+  return '<span class="comp-count" data-pid="'+esc(firstId||'')+'" data-tooltip="'+tooltipAttr({title:'组件列表（'+parts.length+' 个）',items:parts.map(p=>({id:p.id,name:p.name}))})+'">'+parts.length+' 个</span>';
 }
 function findGenerationForSkill(skill){
   const gens=((DATA&&DATA.workshop)||{}).generations||[];
@@ -2355,7 +2375,7 @@ function _renderSkillDev(c){
     }
     const parts=resolveGenerationParts(g);
     const compCountHtml=parts.length
-      ?'<span class="comp-count" data-tooltip="'+tooltipAttr({title:'组件列表（'+parts.length+' 个）',desc:parts.map(p=>p.name).join('、')})+'" data-pids="'+esc(parts.map(p=>p.id).join(','))+'">'+parts.length+' 个</span>'
+      ?'<span class="comp-count" data-tooltip="'+tooltipAttr({title:'组件列表（'+parts.length+' 个）',items:parts.map(p=>({id:p.id,name:p.name}))})+'" data-pids="'+esc(parts.map(p=>p.id).join(','))+'">'+parts.length+' 个</span>'
       :'<span style="color:var(--faint)">0 个</span>';
     return '<tr data-job="'+esc(g.id||'')+'">'+
       '<td><div class="skill-name"><div><div class="nm">'+esc(g.name)+'</div><div class="id">'+esc(g.slug||'')+'</div></div></div></td>'+
