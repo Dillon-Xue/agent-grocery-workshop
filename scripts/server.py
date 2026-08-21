@@ -1075,6 +1075,15 @@ class APIHandler(BaseHTTPRequestHandler):
         s = re.sub(r'-+', '-', s).strip('-')
         return s or 'skill'
 
+    def _derive_slug(self, name):
+        """派生 GitHub 仓库名 / SkillHub slug 用的健壮 slug。
+
+        与 _slugify 不同：当 name 无 ASCII（如纯中文名）时不会回退成固定的 'skill'，
+        而是生成 skill-<随机hex>，保证每个 Skill 全局唯一、避免仓库名/slug 冲突碰撞。
+        """
+        base = re.sub(r'[^a-z0-9]+', '-', (name or '').lower()).strip('-')
+        return base if len(base) >= 2 else ('skill-' + uuid.uuid4().hex[:8])
+
     @staticmethod
     def _extract_frontmatter(text):
         fm = {}
@@ -1163,7 +1172,13 @@ class APIHandler(BaseHTTPRequestHandler):
         text = skill_md.read_text(encoding='utf-8')
         fm = self._extract_frontmatter(text)
         name = fm.get('name') or gid
-        slug = (payload.get('slug') or self._slugify(name))
+        # 仓库名(slug)必须唯一合法：优先用已配置 slug；否则中文名经 _slugify 会落到 'skill' 造成碰撞，
+        # 改用 _derive_slug（中文名回退 skill-<hex> 保证唯一），并写回 frontmatter 与发布的 slug 保持一致。
+        raw_slug = (payload.get('slug') or (fm.get('slug') or '').strip() or '').strip()
+        if not re.match(r'^[a-z0-9]+(?:-[a-z0-9]+)*$', raw_slug):
+            raw_slug = self._derive_slug(name)
+        slug = raw_slug
+        self._set_frontmatter_field(skill_md, 'slug', slug)
         token = (CONFIG.get('github') or {}).get('token') or ''
         if not token:
             return self._error('请先在「设置 → GitHub 发布」配置 GitHub Token 后再提交 Git（未配置无法同步到 Git）')
@@ -1173,6 +1188,10 @@ class APIHandler(BaseHTTPRequestHandler):
         gh = self._find_gh()
         owner = self._gh_whoami(env)
         repo_url = 'https://github.com/{0}/{1}.git'.format(owner, slug)
+        if payload.get('dry_run'):
+            return self._json({'ok': True, 'dry_run': True, 'slug': slug, 'owner': owner,
+                               'repo_url': repo_url,
+                               'steps': ['(dry-run) 将创建并推送 GitHub 仓库 {0}/{1}'.format(owner, slug)]})
         steps = []
         try:
             try:
