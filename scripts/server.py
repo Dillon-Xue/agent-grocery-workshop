@@ -599,8 +599,8 @@ class APIHandler(BaseHTTPRequestHandler):
             import io, contextlib
             buf = io.StringIO()
             with contextlib.redirect_stdout(buf):
-                scan_console.main([])
-            logger.info(f"console_data.json 已重新生成:\n{buf.getvalue()[:500]}")
+                scan_console.main(['--quick'])
+            logger.info(f"console_data.json 已重新生成（快速模式）:\n{buf.getvalue()[:500]}")
         except Exception as e:
             logger.error(f"删除后重新生成 console_data.json 失败: {e}\n{traceback.format_exc()}")
         return self._json({
@@ -1540,13 +1540,14 @@ def summarize_text(text, llm):
 
 
 def run(port=8080):
-    # 启动时自动生成/刷新 console_data.json 快照，确保页面加载的是最新数据
+    # 启动时用快速模式生成/刷新 console_data.json 快照，避免 100+ skill 跨 WSL 全量扫描阻塞启动。
+    # 完整扫描（token/安全）后续可通过 /api/refresh 或手动运行 scan_console.py 触发。
     try:
         import io, contextlib
         buf = io.StringIO()
         with contextlib.redirect_stdout(buf):
-            scan_console.main([])
-        logger.info(f"启动时已刷新 console_data.json:\n{buf.getvalue()[:500]}")
+            scan_console.main(['--quick'])
+        logger.info(f"启动时已刷新 console_data.json（快速模式）:\n{buf.getvalue()[:500]}")
     except Exception as e:
         logger.error(f"启动时刷新 console_data.json 失败: {e}\n{traceback.format_exc()}")
     print(f"WorkBuddy Console Server: http://0.0.0.0:{port}")

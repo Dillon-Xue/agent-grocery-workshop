@@ -26,7 +26,29 @@ if sys.platform == "win32":
         pass
 
 # ── 配置 ────────────────────────────────────────────
-WORKBUDDY_HOME = os.path.expanduser("~/.workbuddy")
+def detect_workbuddy_home():
+    """探测 WorkBuddy 主目录。
+
+    优先级：
+    1. 环境变量 WORKBUDDY_HOME
+    2. WSL 下探测挂载的 Windows 用户目录 /mnt/c/Users/<user>/.workbuddy
+    3. 当前用户 home 下的 ~/.workbuddy
+    """
+    env = os.environ.get('WORKBUDDY_HOME')
+    if env:
+        return env
+    # WSL 环境：找 Windows 用户目录下真实存在的 .workbuddy（排除系统目录）
+    win_users = '/mnt/c/Users'
+    if os.path.isdir(win_users):
+        for name in sorted(os.listdir(win_users)):
+            if name in ('Public', 'Default', 'All Users', 'Default User'):
+                continue
+            cand = os.path.join(win_users, name, '.workbuddy')
+            if os.path.isdir(cand):
+                return cand
+    return os.path.expanduser("~/.workbuddy")
+
+WORKBUDDY_HOME = detect_workbuddy_home()
 SKILLS_DIR = os.path.join(WORKBUDDY_HOME, "skills")
 USAGE_LOG = os.path.join(WORKBUDDY_HOME, "usage-log.json")
 PROJECTS_DIR = os.path.join(WORKBUDDY_HOME, "projects")
@@ -163,6 +185,49 @@ def read_file_safe(path):
 
 # ── Skill 扫描 ──────────────────────────────────────
 
+def iter_skill_files(sdir, max_files=120):
+    """受控遍历 skill 目录下的候选文本文件。
+
+    限制每个 skill 处理的文件数，避免跨 WSL 访问 Windows 文件系统时
+    因 node_modules/.git 等目录导致扫描极慢。
+    """
+    HEAVY_DIRS = {
+        '.git', 'node_modules', '__pycache__', '.venv', 'venv', 'dist', 'build', 'vendor',
+        '.pytest_cache', '.mypy_cache', '.ruff_cache', '.next', '.nuxt', 'out', '.output',
+        '.cache', 'coverage', 'htmlcov', '.turbo', '.parcel-cache', '.gradle',
+    }
+    TEXT_EXTS = {
+        '.py', '.sh', '.ps1', '.bat', '.md', '.js', '.ts', '.json', '.yaml', '.yml', '.txt',
+        '.html', '.css', '.scss', '.vue', '.jsx', '.tsx', '.svelte',
+    }
+    count = 0
+
+    # 优先访问顶层和常用子目录，最后兜底其它子目录
+    roots = [sdir]
+    late_roots = []
+    for entry in sorted(os.listdir(sdir)):
+        sp = os.path.join(sdir, entry)
+        if not os.path.isdir(sp) or entry in HEAVY_DIRS:
+            continue
+        if entry in ('scripts', 'references', 'assets'):
+            roots.append(sp)
+        else:
+            late_roots.append(sp)
+    roots.extend(late_roots)
+
+    for root in roots:
+        for r, ds, fs in os.walk(root):
+            ds[:] = [d for d in ds if d not in HEAVY_DIRS]
+            for fn in sorted(fs):
+                ext = os.path.splitext(fn)[1].lower()
+                if ext not in TEXT_EXTS:
+                    continue
+                yield os.path.join(r, fn)
+                count += 1
+                if count >= max_files:
+                    return
+
+
 def scan_skills():
     """扫描 ~/.workbuddy/skills/ 下所有已安装 skill"""
     skills = []
@@ -204,32 +269,40 @@ def scan_skills():
         elif os.path.exists(os.path.join(sdir, '.git')):
             source = "GitHub"
 
-        # ── 文件统计 + token 估算
+        # ── 文件统计 + token 估算 + 安全扫描（统一遍历，限制文件数）
         total_tokens = estimate_tokens(content)
         total_bytes = len(content.encode('utf-8'))
         fcount = 1
+        sec_tier = "低"
+        tier_order = {"低": 0, "中": 1, "高": 2, "危": 3}
+        sec_findings = []
 
-        for sub in ('scripts', 'references', 'assets'):
-            sd = os.path.join(sdir, sub)
-            if os.path.isdir(sd):
-                for r, ds, fs in os.walk(sd):
-                    ds[:] = [d for d in ds if d not in SKIP_DIRS]
-                    for fn in fs:
-                        ext = os.path.splitext(fn)[1].lower()
-                        if ext in TOKEN_SKIP_EXT:
-                            continue
-                        fp = os.path.join(r, fn)
-                        try:
-                            sz = os.path.getsize(fp)
-                        except OSError:
-                            continue
-                        total_bytes += sz
-                        fcount += 1
-                        if sz > MAX_TOKEN_FILE:
-                            total_tokens += sz // 4   # 大文件按体积粗略估算
-                            continue
-                        fc = read_file_safe(fp)
-                        total_tokens += estimate_tokens(fc)
+        for fp in iter_skill_files(sdir, max_files=120):
+            try:
+                sz = os.path.getsize(fp)
+            except OSError:
+                continue
+            total_bytes += sz
+            fcount += 1
+
+            # token 估算（跳过大文件和二进制扩展名）
+            ext = os.path.splitext(fp)[1].lower()
+            if ext not in TOKEN_SKIP_EXT and sz <= MAX_TOKEN_FILE:
+                fc = read_file_safe(fp)
+                total_tokens += estimate_tokens(fc)
+
+            # 安全扫描（只扫描已知脚本/文档扩展名且大小限制内）
+            if ext in {'.py', '.sh', '.ps1', '.bat', '.md', '.js', '.ts'} and sz <= SEC_MAX_FILE:
+                fc = read_file_safe(fp)
+                for pat, sev, note in SECURITY_RULES:
+                    if re.search(pat, fc):
+                        sec_findings.append({
+                            "file": os.path.relpath(fp, sdir),
+                            "severity": sev,
+                            "note": note,
+                        })
+                        if tier_order.get(sev, 0) > tier_order.get(sec_tier, 0):
+                            sec_tier = sev
 
         # ── 安装时间
         install_date = ""
@@ -239,32 +312,6 @@ def scan_skills():
             install_date = datetime.fromtimestamp(ts).strftime('%Y-%m-%d')
         except:
             pass
-
-        # ── 安全扫描
-        tier_order = {"低": 0, "中": 1, "高": 2, "危": 3}
-        sec_tier = "低"
-        sec_findings = []
-        for r, ds, fs in os.walk(sdir):
-            ds[:] = [d for d in ds if d not in SKIP_DIRS]
-            for fn in fs:
-                if not fn.endswith(('.py', '.sh', '.ps1', '.bat', '.md', '.js', '.ts')):
-                    continue
-                fp = os.path.join(r, fn)
-                try:
-                    if os.path.getsize(fp) > SEC_MAX_FILE:
-                        continue
-                except OSError:
-                    continue
-                fc = read_file_safe(fp)
-                for pat, sev, note in SECURITY_RULES:
-                    if re.search(pat, fc):
-                        sec_findings.append({
-                            "file": os.path.relpath(os.path.join(r, fn), sdir),
-                            "severity": sev,
-                            "note": note,
-                        })
-                        if tier_order.get(sev, 0) > tier_order.get(sec_tier, 0):
-                            sec_tier = sev
 
         token_anomaly = total_tokens >= 6000
 
@@ -283,6 +330,76 @@ def scan_skills():
             "anomaly": token_anomaly,
             "security_tier": sec_tier,
             "security_findings": sec_findings,
+        })
+
+    return skills
+
+
+def scan_skills_quick():
+    """快速扫描：只读 SKILL.md，不遍历子目录，避免 WSL 跨盘大量文件 IO 阻塞。"""
+    skills = []
+    if not os.path.isdir(SKILLS_DIR):
+        return skills
+
+    for entry in sorted(os.listdir(SKILLS_DIR)):
+        sdir = os.path.join(SKILLS_DIR, entry)
+        if not os.path.isdir(sdir):
+            continue
+        smd = os.path.join(sdir, "SKILL.md")
+        if not os.path.isfile(smd):
+            continue
+
+        content = read_file_safe(smd)
+        fm = parse_frontmatter(content)
+        body = re.sub(r'^---\s*\n.*?\n---\s*\n', '', content, flags=re.DOTALL)
+
+        name = fm.get('display_name') or fm.get('name', entry)
+        desc = fm.get('description', '')
+        if not desc:
+            for line in body.split('\n'):
+                t = line.strip()
+                if t and not t.startswith('#'):
+                    desc = t[:120]
+                    break
+
+        source = "手动安装"
+        if os.path.exists(os.path.join(sdir, '_skillhub_meta.json')):
+            source = "SkillHub市场"
+        elif entry.endswith('__skillhub'):
+            source = "SkillHub市场"
+        elif os.path.exists(os.path.join(sdir, '_knot_meta.json')):
+            source = "Knot市场"
+        elif fm.get('agent_created') == 'true':
+            source = "本机自建"
+        elif os.path.exists(os.path.join(sdir, '.git')):
+            source = "GitHub"
+
+        total_tokens = estimate_tokens(content)
+        total_bytes = len(content.encode('utf-8'))
+
+        install_date = ""
+        try:
+            st = os.stat(sdir)
+            ts = getattr(st, 'st_birthtime', 0) or st.st_ctime
+            install_date = datetime.fromtimestamp(ts).strftime('%Y-%m-%d')
+        except:
+            pass
+
+        skills.append({
+            "id": entry,
+            "name": name,
+            "display_name": cn_name(entry),
+            "description": desc,
+            "level": "用户级",
+            "source": source,
+            "install_date": install_date,
+            "token": total_tokens,
+            "size_bytes": total_bytes,
+            "size_human": size_human(total_bytes),
+            "file_count": 1,
+            "anomaly": total_tokens >= 6000,
+            "security_tier": "低",
+            "security_findings": [],
         })
 
     return skills
@@ -554,14 +671,16 @@ def scan_env():
 def main(argv=None):
     parser = argparse.ArgumentParser(description="WorkBuddy 控制台数据聚合")
     parser.add_argument('--output', '-o', default=None, help='输出 JSON 路径')
+    parser.add_argument('--quick', action='store_true', help='快速模式：只读 SKILL.md，不遍历子目录')
     args = parser.parse_args(argv)
 
     t0 = datetime.now()
-    print(f"🛠️  WorkBuddy 控制台 · 数据聚合  {t0.strftime('%H:%M:%S')}")
+    mode_label = "快速" if args.quick else "完整"
+    print(f"🛠️  WorkBuddy 控制台 · 数据聚合（{mode_label}）  {t0.strftime('%H:%M:%S')}")
     print("─" * 48)
 
     # 1
-    skills = scan_skills()
+    skills = scan_skills_quick() if args.quick else scan_skills()
     print(f"  [1/5] Skill 扫描  →  {len(skills)} 个")
 
     # 2
@@ -575,12 +694,23 @@ def main(argv=None):
     print(f"  [3/5] 安全扫描  →  {total_findings} 条提示, {sev_warn} 个高风险")
 
     # 4
-    cats, sumry = scan_storage()
+    if args.quick:
+        # 快速模式：存储统计全部置 0，避免 WSL 跨 Windows 文件系统遍历任意目录阻塞启动。
+        # 完整存储分析请运行 scan_console.py（不带 --quick）或在非 WSL 环境下使用。
+        cats = [{**c, "size_bytes": 0, "size_human": "0 B", "file_count": 0} for c in STORAGE_CATEGORIES]
+        sumry = {
+            "safe_total": "0 B", "safe_bytes": 0,
+            "cautious_total": "0 B", "cautious_bytes": 0,
+            "skill_total": "0 B", "skill_bytes": 0,
+            "never_total": "0 B", "never_bytes": 0,
+        }
+    else:
+        cats, sumry = scan_storage()
     total_st = sum(c['size_bytes'] for c in cats)
     print(f"  [4/5] 存储扫描  →  {size_human(total_st)}")
 
     # 5
-    convos = scan_conversations()
+    convos = {"total": 0, "recent_7d": 0, "recent_30d": 0, "by_project": []} if args.quick else scan_conversations()
     print(f"  [5/6] 对话统计  →  {convos['total']} 个对话")
 
     # 6
