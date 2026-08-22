@@ -20,7 +20,7 @@ tags:
 summary: 装了一堆 Skill 却管不过来？WorkBuddy 运维控制台一站式解决：自动拼装并发布 Skill 到 SkillHub、Skill 健康度检测与一键升级 / 安全删除、存储清理、历史对话全文检索、飞书工单闭环，还能一键生成只读分享页。
 homepage: https://github.com/Dillon-Xue/agent-grocery-workshop
 license: MIT
-version: 1.0.0
+version: 1.0.1
 allowed-tools:
   - Read
   - Write
