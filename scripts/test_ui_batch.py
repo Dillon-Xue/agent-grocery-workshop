@@ -54,8 +54,11 @@ def main():
     # 5. 工单快照：build_static 输出中存在 TICKET_SNAPSHOT（稍后校验）
     check("工单列表支持分页变量", "TK_PAGE_SIZE=10" in html and "renderTicketPager" in html, "")
 
-    # 6. 查询控件可点击：静态快照模式不强制 disabled，且已增加分页
-    check("工单筛选器可点击（静态快照不禁用）", "if(isStatic && !hasProxy && !hasSnapshot)" in html, "")
+    # 6. 工单筛选器已移除：不再保留类型/状态下拉框，仅保留查询框
+    check("工单筛选器已移除", 'id="tk-filter-status"' not in html and 'id="tk-filter-type"' not in html, "")
+
+    # 6.1 新建工单按钮可点击：静态快照页也不再禁用
+    check("新建工单按钮始终可点击", "newBtn.onclick = ()=>{ openTicketModal(); };" in html, "")
 
     # 7. 设置页：无底部保存条
     check("设置页去掉底部保存条", 'id="cfg-save"' not in html and "LLM 与 SkillHub 配置保存在本地" not in html, "")
