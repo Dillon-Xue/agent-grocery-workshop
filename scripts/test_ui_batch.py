@@ -77,6 +77,13 @@ def main():
     # 12. 工单管理去掉页面内标题
     check("工单管理去掉页面标题", '<h2>🎫 工单管理</h2>' not in html, "")
 
+    # 13. 工单管理去掉静态快照提示文字
+    check("工单管理去掉静态快照提示", '静态快照 · 仅可查看' not in html, "")
+
+    # 14. 工单查询框 placeholder 风格与 Skill 管理一致（搜索 XX / XX…）
+    check("工单管理查询框 placeholder 统一",
+          'id="tk-search-id" placeholder="搜索工单号 / 问题描述…"' in html, "")
+
     # 后端接口测试
     code, data = req("GET", "/api/tickets")
     check("GET /api/tickets", code == 200 and data.get("ok") and isinstance(data.get("items"), list),
