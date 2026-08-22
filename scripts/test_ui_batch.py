@@ -83,9 +83,10 @@ def main():
     # 13. 工单管理去掉静态快照提示文字
     check("工单管理去掉静态快照提示", '静态快照 · 仅可查看' not in html, "")
 
-    # 14. 工单查询框 placeholder 风格与 Skill 管理一致（搜索 XX / XX…）
-    check("工单管理查询框 placeholder 统一",
-          'id="tk-search-id" placeholder="搜索工单号 / 问题描述…"' in html, "")
+    # 14. 工单查询框与 Skill 开发页查询框结构/样式完全一致（.tbl-tools + flex:1;min-width:240px）
+    check("工单管理查询框与 Skill 开发一致",
+          '<div class="tbl-tools" style="margin-bottom:14px">' in html and
+          '<div class="search-box" style="flex:1;min-width:240px"><span class="si">🔍</span><input id="tk-search-id"' in html, "")
 
     # 后端接口测试
     code, data = req("GET", "/api/tickets")
