@@ -57,6 +57,15 @@ def inject_static_mode(html: str) -> str:
             "<script>\nconst TAB_META",
             "<script>\nwindow.STATIC_MODE = true;\nconst TAB_META",
         )
+    # 注入分享页工单云代理地址（部署分享页时通过环境变量 TICKET_API_BASE 传入；
+    # 留空则不注入，前端回退到同域后端，本地控制台不受影响）
+    ticket_api = os.environ.get("TICKET_API_BASE", "").strip().rstrip("/")
+    if ticket_api:
+        new_html = new_html.replace(
+            "<script>\nwindow.STATIC_MODE = true;",
+            f"<script>\nwindow.TICKET_API_BASE = {json.dumps(ticket_api)};\nwindow.STATIC_MODE = true;",
+            1,
+        )
     return new_html
 
 

@@ -18,6 +18,9 @@ server.log
 # ── 本地测试套件（未纳入版本管理，仅本机跑 pytest）──
 tests/
 
+# ── 飞书凭证（本地 .env，禁止提交）──
+.env
+
 # ── 生成的演示 Skill / 报告（可重生成，保持 skill 精简）──
 # 保留 generations/.gitkeep 维持目录；其余演示产物不提交
 generations/*

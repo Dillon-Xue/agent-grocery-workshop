@@ -20,7 +20,30 @@ from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+
+def _load_env_file():
+    """从项目根目录的 .env 加载环境变量（仅当系统尚未设置时填充；不覆盖已有值）。"""
+    env_path = Path(__file__).resolve().parent.parent / ".env"
+    if not env_path.exists():
+        return
+    try:
+        for line in env_path.read_text(encoding="utf-8").splitlines():
+            line = line.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            k, v = line.split("=", 1)
+            k, v = k.strip(), v.strip().strip('"').strip("'")
+            if k and k not in os.environ:
+                os.environ[k] = v
+    except Exception:
+        pass
+
+
+_load_env_file()
+
 from workshop import Workshop
+from feishu_ticket import submit_ticket, query_ticket, validate_submit, rate_limited
 
 # ── 日志 ──
 LOG_DIR = Path.home() / ".workbuddy" / "logs"
@@ -278,6 +301,8 @@ class APIHandler(BaseHTTPRequestHandler):
             return self._json({"ok": True, "config": {"llm": CONFIG.get("llm", {}), "skillhub": CONFIG.get("skillhub", {}), "github": CONFIG.get("github", {})}})
         if path == "/api/workshop":
             return self.handle_workshop_data({})
+        if path == "/api/ticket":
+            return self.handle_ticket_query(parsed)
         if path.startswith("/api/"):
             return self._error("Unsupported GET endpoint", 404)
         # 静态文件
@@ -359,6 +384,8 @@ class APIHandler(BaseHTTPRequestHandler):
             return self.handle_skill_git(payload)
         if path == "/api/skill/publish":
             return self.handle_skill_publish(payload)
+        if path == "/api/ticket":
+            return self.handle_ticket_submit(payload)
         return self._error("Unsupported POST endpoint", 404)
 
     def handle_search(self, payload):
@@ -1560,6 +1587,60 @@ class APIHandler(BaseHTTPRequestHandler):
         except Exception as e:
             logger.error('概览聚合失败: %s\n%s', e, traceback.format_exc())
             return self._error('概览聚合失败：' + str(e))
+
+    # ── 工单管理（飞书多维表格）──
+    def handle_ticket_submit(self, payload):
+        """提交工单：写飞书表，返回工单号 + 状态。带频率限制与输入校验。"""
+        try:
+            client_ip = self.client_address[0] if self.client_address else "local"
+            if rate_limited("submit:" + str(client_ip), limit=20, window=60):
+                return self._error("提交过于频繁，请稍后再试", 429)
+            ok, err = validate_submit(payload or {})
+            if not ok:
+                return self._error(err, 400)
+            result = submit_ticket({
+                "user": (payload.get("user") or "").strip(),
+                "contact": (payload.get("contact") or "").strip(),
+                "type": (payload.get("type") or "").strip(),
+                "desc": (payload.get("desc") or "").strip(),
+                "expect": (payload.get("expect") or "").strip(),
+                "version": (payload.get("version") or "").strip(),
+            })
+            if not result.get("ok"):
+                logger.error("工单提交失败: %s", result.get("error"))
+                return self._error(result.get("error") or "工单提交失败，请稍后重试", 502)
+            return self._json({
+                "ok": True,
+                "ticket": result["ticket"],
+                "status": result["status"],
+                "message": "工单已提交，工单号已生成，可在「我的工单」中查询状态。",
+            })
+        except Exception as e:
+            logger.error("工单提交异常: %s\n%s", e, traceback.format_exc())
+            return self._error("工单提交失败，请稍后重试", 502)
+
+    def handle_ticket_query(self, parsed):
+        """按工单号查询状态。支持 /api/ticket?ticket=FB-0007。"""
+        try:
+            from urllib.parse import parse_qs
+            ticket_id = (parse_qs(parsed.query).get("ticket", [""])[0] if parsed.query else "").strip()
+            if not ticket_id:
+                return self._error("请提供工单号", 400)
+            result = query_ticket(ticket_id)
+            if not result.get("ok"):
+                return self._error(result.get("error") or "查询失败", 502)
+            if not result.get("found"):
+                return self._json({"ok": True, "found": False, "ticket": ticket_id})
+            return self._json({
+                "ok": True,
+                "found": True,
+                "ticket": result["ticket"],
+                "status": result["status"],
+                "fields": result["fields"],
+            })
+        except Exception as e:
+            logger.error("工单查询异常: %s\n%s", e, traceback.format_exc())
+            return self._error("工单查询失败，请稍后重试", 502)
 
 # ── 回收站 / 安全工具（模块级）──
 CONVERSATIONS_DIR = WORKBUDDY_ROOT / "projects"
