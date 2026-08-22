@@ -220,6 +220,36 @@ def query(ticket_id):
     return {"ok": True, "found": False}
 
 
+def list_tickets(status=None, ticket_type=None, limit=200):
+    """拉取工单列表，支持状态/类型筛选，按提出时间倒序。"""
+    token = _get_token()
+    base = _env("FEISHU_BASE_TOKEN", DEFAULT_BASE_TOKEN)
+    table = _env("FEISHU_TABLE_ID", DEFAULT_TABLE_ID)
+    items = []
+    for f in _list_all(token, base, table):
+        tid = _norm(f.get(FIELD_TICKET))
+        if not tid:
+            continue
+        s = _norm(f.get(FIELD_STATUS)) or DEFAULT_STATUS
+        t = _norm(f.get(FIELD_TYPE)) or ""
+        if status and s != status:
+            continue
+        if ticket_type and t != ticket_type:
+            continue
+        items.append({
+            "ticket": tid, "status": s, "type": t,
+            "desc": f.get(FIELD_DESC, ""), "expect": f.get(FIELD_EXPECT, ""),
+            "user": f.get(FIELD_USER, ""), "contact": f.get(FIELD_CONTACT, ""),
+            "version": f.get(FIELD_VERSION, ""),
+            "remark": f.get(FIELD_REMARK, "") if isinstance(f.get(FIELD_REMARK), str) else "",
+            "submit_time": f.get(FIELD_TIME, ""),
+        })
+    items.sort(key=lambda x: x["submit_time"] or "0", reverse=True)
+    if limit:
+        items = items[:limit]
+    return {"ok": True, "items": items}
+
+
 def rate_limited(key, limit=20, window=60):
     now = time.time()
     with _RATE_LOCK:
@@ -247,6 +277,19 @@ def handle_ticket(event):
         payload = {}
 
     client_ip = (event.get("requestContext") or {}).get("sourceIp", "unknown")
+
+    # 列表查询（GET /tickets）
+    if method == "GET" and path.rstrip("/") == "/tickets":
+        status = (qs.get("status") or [""])[0] if isinstance(qs.get("status"), list) else qs.get("status", "")
+        ticket_type = (qs.get("type") or [""])[0] if isinstance(qs.get("type"), list) else qs.get("type", "")
+        try:
+            res = list_tickets(status=status.strip() or None,
+                               ticket_type=ticket_type.strip() or None,
+                               limit=200)
+            return 200, res
+        except Exception:
+            return 502, {"ok": False, "error": "查询失败，请稍后重试"}
+
     if method == "POST":
         if rate_limited("submit:" + str(client_ip), limit=20, window=60):
             return 429, {"ok": False, "error": "提交过于频繁，请稍后再试"}
@@ -261,7 +304,7 @@ def handle_ticket(event):
             return 502, res
         return 200, {"ok": True, "ticket": res["ticket"], "status": res["status"],
                      "message": "工单已提交，可在「我的工单」中查询状态。"}
-    else:  # GET
+    else:  # GET /ticket
         ticket_id = (qs.get("ticket") or [""])[0] if isinstance(qs.get("ticket"), list) else qs.get("ticket", "")
         ticket_id = (ticket_id or "").strip()
         if not ticket_id:

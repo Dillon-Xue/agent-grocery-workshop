@@ -43,7 +43,7 @@ def _load_env_file():
 _load_env_file()
 
 from workshop import Workshop
-from feishu_ticket import submit_ticket, query_ticket, validate_submit, rate_limited
+from feishu_ticket import submit_ticket, query_ticket, list_tickets, validate_submit, rate_limited
 
 # ── 日志 ──
 LOG_DIR = Path.home() / ".workbuddy" / "logs"
@@ -303,6 +303,8 @@ class APIHandler(BaseHTTPRequestHandler):
             return self.handle_workshop_data({})
         if path == "/api/ticket":
             return self.handle_ticket_query(parsed)
+        if path == "/api/tickets":
+            return self.handle_ticket_list(parsed)
         if path.startswith("/api/"):
             return self._error("Unsupported GET endpoint", 404)
         # 静态文件
@@ -1641,6 +1643,21 @@ class APIHandler(BaseHTTPRequestHandler):
         except Exception as e:
             logger.error("工单查询异常: %s\n%s", e, traceback.format_exc())
             return self._error("工单查询失败，请稍后重试", 502)
+
+    def handle_ticket_list(self, parsed):
+        """工单列表。支持 /api/tickets?status=新增&type=问题。"""
+        try:
+            from urllib.parse import parse_qs
+            qs = parse_qs(parsed.query) if parsed.query else {}
+            status = (qs.get("status", [""])[0] or "").strip() or None
+            ticket_type = (qs.get("type", [""])[0] or "").strip() or None
+            result = list_tickets(status=status, ticket_type=ticket_type, limit=200)
+            if not result.get("ok"):
+                return self._error(result.get("error") or "查询失败", 502)
+            return self._json(result)
+        except Exception as e:
+            logger.error("工单列表异常: %s\n%s", e, traceback.format_exc())
+            return self._error("工单列表查询失败，请稍后重试", 502)
 
 # ── 回收站 / 安全工具（模块级）──
 CONVERSATIONS_DIR = WORKBUDDY_ROOT / "projects"

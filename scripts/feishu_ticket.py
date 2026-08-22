@@ -210,6 +210,54 @@ def _list_all_records(token, base_token, table_id, page_size=100):
     return out
 
 
+def _parse_time(v):
+    """把飞书时间字段统一成 ISO 字符串或原值。"""
+    if isinstance(v, (int, float)):
+        return datetime.fromtimestamp(v / 1000, tz=timezone(timedelta(hours=8))).isoformat()
+    if isinstance(v, str):
+        return v
+    return ""
+
+
+def list_tickets(status=None, ticket_type=None, limit=200):
+    """拉取工单列表，支持按状态、类型筛选，按提出时间倒序。
+
+    返回 {"ok":True,"items":[...]}，每个 item 包含：
+    ticket, status, type, desc, expect, user, contact, version, remark, submit_time。
+    """
+    token = _get_token()
+    base_token = _env("FEISHU_BASE_TOKEN", DEFAULT_BASE_TOKEN)
+    table_id = _env("FEISHU_TABLE_ID", DEFAULT_TABLE_ID)
+    items = []
+    for f in _list_all_records(token, base_token, table_id):
+        tid = _norm_ticket(f.get(FIELD_TICKET))
+        if not tid:
+            continue
+        s = _norm_status(f.get(FIELD_STATUS)) or DEFAULT_STATUS
+        t = _norm_status(f.get(FIELD_TYPE)) or ""
+        if status and s != status:
+            continue
+        if ticket_type and t != ticket_type:
+            continue
+        items.append({
+            "ticket": tid,
+            "status": s,
+            "type": t,
+            "desc": f.get(FIELD_DESC, ""),
+            "expect": f.get(FIELD_EXPECT, ""),
+            "user": f.get(FIELD_USER, ""),
+            "contact": f.get(FIELD_CONTACT, ""),
+            "version": f.get(FIELD_VERSION, ""),
+            "remark": f.get(FIELD_REMARK, "") if isinstance(f.get(FIELD_REMARK), str) else "",
+            "submit_time": _parse_time(f.get(FIELD_TIME)),
+        })
+    # 按提出时间倒序；无时间放最后
+    items.sort(key=lambda x: x["submit_time"] or "0", reverse=True)
+    if limit:
+        items = items[:limit]
+    return {"ok": True, "items": items}
+
+
 # 工单查询缓存（进程内，短时效，避免每次查询全表拉取）
 _TICKET_CACHE = {"ts": 0.0, "data": {}}
 _TICKET_CACHE_LOCK = threading.Lock()
