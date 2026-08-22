@@ -1,9 +1,23 @@
 ---
 name: agent-grocery-workshop
-display_name: WorkBuddy 控制台 (Skill Console)
+slug: workbuddy
+displayName: WorkBuddy
+display_name: WorkBuddy
 description: WorkBuddy 本地管控台与 Skill 自动组装引擎。统一管理已装 Skill 的健康度、升级与删除，查看存储占用与清理，浏览并全文检索历史对话，提交与跟踪工单，并通过零件库自动拼装新 Skill；可将控制台构建为只读静态分享页发给他人。当用户说「打开控制台 / 管理我的 Skill / 清理 WorkBuddy 存储 / 看我的 Agent 构成 / 零件库里有什么 / 提交工单 / 生成分享链接 / 自动帮我生成一个 Skill」等意图时唤起；安装后通过 WorkBuddy「与 Skill 对话」入口选择本 Skill 即可在浏览器打开控制台。
 description_zh: WorkBuddy 本地管控台与 Skill 自动组装引擎，统一管理已装 Skill、空间管理、历史对话、工单管理，并支持用零件库自动拼装新 Skill、生成只读静态分享页。
 description_en: Local WorkBuddy console and Skill auto-assembly engine. Manage installed Skills (health/upgrade/delete), storage, conversation history, ticket management, and assemble new Skills from a parts library; publish a read-only static sharing page.
+tags:
+  - workbuddy
+  - console
+  - skill-manager
+  - 管控台
+  - 零件库
+  - 工单管理
+  - 静态分享页
+  - skill-assembly
+summary: WorkBuddy 本地管控台 + 零件自动组装引擎：统一管理 Skill 健康度/存储/对话/工单，并用零件库自动拼装新 Skill，可一键生成只读静态分享页。
+homepage: https://github.com/Dillon-Xue/agent-grocery-workshop
+license: MIT
 version: 1.0.0
 allowed-tools:
   - Read
