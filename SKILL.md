@@ -1,11 +1,11 @@
 ---
 name: agent-grocery-workshop
 slug: workbuddy
-displayName: WorkBuddy
-display_name: WorkBuddy
-description: WorkBuddy 本地管控台与 Skill 自动组装引擎。统一管理已装 Skill 的健康度、升级与删除，查看存储占用与清理，浏览并全文检索历史对话，提交与跟踪工单，并通过零件库自动拼装新 Skill；可将控制台构建为只读静态分享页发给他人。当用户说「打开控制台 / 管理我的 Skill / 清理 WorkBuddy 存储 / 看我的 Agent 构成 / 零件库里有什么 / 提交工单 / 生成分享链接 / 自动帮我生成一个 Skill」等意图时唤起；安装后通过 WorkBuddy「与 Skill 对话」入口选择本 Skill 即可在浏览器打开控制台。
-description_zh: WorkBuddy 本地管控台与 Skill 自动组装引擎，统一管理已装 Skill、空间管理、历史对话、工单管理，并支持用零件库自动拼装新 Skill、生成只读静态分享页。
-description_en: Local WorkBuddy console and Skill auto-assembly engine. Manage installed Skills (health/upgrade/delete), storage, conversation history, ticket management, and assemble new Skills from a parts library; publish a read-only static sharing page.
+displayName: WorkBuddy运维控制台
+display_name: WorkBuddy运维控制台
+description: 你装了一堆 Skill，却总在不断踩坑：到底哪个该升级、哪个有安全风险、哪个其实是重复的，全靠肉眼翻；WorkBuddy 存储悄悄涨到几个 G，想清又不敢乱删；半年前和某个 Skill 的对话翻不到；想报 Bug 找不到入口；从零手搓一个新 Skill 更要写一堆文件、配一堆东西。WorkBuddy 运维控制台把这些痛点一次解决：🚀 特色功能——支持自动 Skill 开发并发布 SkillHub，凭一句话需求由零件库自动检索、拼装成可安装 Skill 并一键上架，无需手写发布流程；🩺 Skill 健康度自动检测更新 / 安全风险 / 功能重叠，一键升级，删除先 AI 总结备份再进回收站、可恢复；🧹 存储按日志 / 会话 / 缓存分类，一键清理，会话类先生成总结备份再清；🔎 历史对话跨所有会话全文检索并高亮，点结果即定位；🎫 内置飞书工单，提交 / 按号查询 / 跟踪处理状态；📤 一键生成只读分享页，把 Agent 资产全景发给别人看，对方无需 WorkBuddy 环境。当用户说「打开控制台 / 管理 Skill / 清理存储 / 看对话 / 零件库 / 提交工单 / 生成分享链接 / 自动帮我生成一个 Skill / 发布到 SkillHub」等意图时唤起；安装后通过 WorkBuddy「与 Skill 对话」入口选择本 Skill 即可在浏览器打开控制台。
+description_zh: 装了一堆 Skill 却管不过来？WorkBuddy 运维控制台一站式解决：自动拼装并发布 Skill 到 SkillHub、Skill 健康度检测与一键升级 / 安全删除、存储清理、历史对话全文检索、飞书工单闭环，还能一键生成只读分享页。
+description_en: Drowning in installed Skills? WorkBuddy Ops Console fixes it all in one place — auto-assemble and publish Skills to SkillHub, health-check / upgrade / safe-delete, storage cleanup, full-text conversation search, Feishu ticketing, and one-click read-only share pages.
 tags:
   - workbuddy
   - console
@@ -15,7 +15,9 @@ tags:
   - 工单管理
   - 静态分享页
   - skill-assembly
-summary: WorkBuddy 本地管控台 + 零件自动组装引擎：统一管理 Skill 健康度/存储/对话/工单，并用零件库自动拼装新 Skill，可一键生成只读静态分享页。
+  - 运维控制台
+  - skill发布
+summary: 装了一堆 Skill 却管不过来？WorkBuddy 运维控制台一站式解决：自动拼装并发布 Skill 到 SkillHub、Skill 健康度检测与一键升级 / 安全删除、存储清理、历史对话全文检索、飞书工单闭环，还能一键生成只读分享页。
 homepage: https://github.com/Dillon-Xue/agent-grocery-workshop
 license: MIT
 version: 1.0.0
@@ -31,7 +33,7 @@ visibility: public
 agent_created: true
 ---
 
-# WorkBuddy 控制台 (Skill Console)
+# WorkBuddy运维控制台
 
 你是一个**本地化的 WorkBuddy Agent 工作台**。它把两件原本分散的事合到一处：一张零依赖的浏览器控制台（管控台），统一管理本机 WorkBuddy 环境；以及一台零件引擎，把已有 Skill / 文档拆成可复用「零件」，再按模糊需求自动检索、冲突二选一、依赖补全，拼装成新 Skill。
 
