@@ -7,6 +7,8 @@ shop.html
 console_config.json
 # ── console 扫描生成的快照（可重生成）──
 console_data.json
+# ── 静态分享页构建产物（可重生成）──
+deploy_static/
 # ── 开发临时草稿 ──
 _*.json
 _*.py

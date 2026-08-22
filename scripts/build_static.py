@@ -23,6 +23,40 @@ SRC_ASSETS = ROOT / "scripts" / "assets"
 DST = ROOT / "deploy_static"
 
 
+def _load_env_file():
+    """加载仓库根目录 .env 到当前进程环境变量，供 feishu_ticket 读取凭证。"""
+    env_path = ROOT / ".env"
+    if not env_path.exists():
+        return
+    for line in env_path.read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, val = line.split("=", 1)
+        key = key.strip()
+        val = val.strip().strip('"').strip("'")
+        if key and os.environ.get(key) is None:
+            os.environ[key] = val
+
+
+def fetch_ticket_snapshot() -> list:
+    """拉取当前飞书多维表格中的全部工单，作为静态分享页的快照数据。
+
+    快照只在构建时注入到 deploy_static/index.html，不进 git（deploy_static/ 已忽略）。
+    """
+    _load_env_file()
+    if not os.environ.get("FEISHU_APP_ID") or not os.environ.get("FEISHU_APP_SECRET"):
+        return []
+    sys.path.insert(0, str(ROOT / "scripts"))
+    try:
+        import feishu_ticket
+        result = feishu_ticket.list_tickets(limit=10000)
+        return result.get("items", []) if result.get("ok") else []
+    except Exception as exc:
+        print(f"[build_static] ticket snapshot failed: {exc}", file=sys.stderr)
+        return []
+
+
 def run_refresher(script_name: str) -> bool:
     script = ROOT / "scripts" / script_name
     if not script.exists():
@@ -87,6 +121,20 @@ def main():
 
     html = open(SRC_HTML, encoding="utf-8").read()
     html = inject_static_mode(html)
+
+    # 注入当前飞书工单快照（只进构建产物，不进 git）
+    snapshot_items = fetch_ticket_snapshot()
+    if snapshot_items:
+        snapshot_json = json.dumps(snapshot_items, ensure_ascii=False, separators=(",", ":"))
+        if "<script>\nconst TAB_META" in html:
+            html = html.replace(
+                "<script>\nconst TAB_META",
+                f"<script>\nwindow.TICKET_SNAPSHOT = {snapshot_json};\nconst TAB_META",
+                1,
+            )
+            print(f"[build_static] ticket snapshot injected: {len(snapshot_items)} items")
+        else:
+            print("[build_static] warning: TICKET_SNAPSHOT anchor not found, skipping injection")
 
     # 校验内联数据 JSON 有效
     m = re.search(r"const EMBEDDED_DATA = (.*?);/\*__WB_DATA_END__\*/", html, re.S)
